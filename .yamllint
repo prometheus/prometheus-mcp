@@ -2,8 +2,7 @@
 extends: default
 ignore: |
   **/node_modules
-  cmd/prometheus-mcp/external/docs/
-  charts/
+  web/api/v1/testdata/openapi_*_golden.yaml
 
 rules:
   braces:
@@ -19,7 +18,9 @@ rules:
   indentation:
     spaces: consistent
     indent-sequences: consistent
-  key-duplicates: {}
+  key-duplicates:
+    ignore: |
+      config/testdata/section_key_dup.bad.yml
   line-length: disable
   truthy:
     check-keys: false
