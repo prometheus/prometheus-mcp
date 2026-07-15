@@ -20,6 +20,12 @@ import (
 	"text/template"
 )
 
+// instructionsRunbook is one runbook inventory line for the instructions.
+type instructionsRunbook struct {
+	Name    string
+	Trigger string
+}
+
 // instructionsTemplateData is the data the instructions template renders
 // against.
 type instructionsTemplateData struct {
@@ -31,6 +37,20 @@ type instructionsTemplateData struct {
 	// The admin tools are registered even when disabled (their handlers
 	// reject calls), so tool presence can't stand in for the flag here.
 	TSDBAdminToolsEnabled bool
+
+	// Runbooks is the inventory rendered into the instructions, one
+	// name + trigger line per embedded runbook; empty when the toolset
+	// lacks the runbook tools.
+	Runbooks []instructionsRunbook
+}
+
+// descriptionTrigger returns the leading sentence of a skill description;
+// SKILL.md descriptions keep it short to serve as the inventory trigger line.
+func descriptionTrigger(desc string) string {
+	if first, _, found := strings.Cut(desc, ". "); found {
+		return first + "."
+	}
+	return desc
 }
 
 // renderInstructions renders the embedded instructions template against the
@@ -57,6 +77,14 @@ func renderInstructions(cfg ServerConfig, toolset map[string]toolRegistration) (
 	data := instructionsTemplateData{
 		Backend:               strings.ToLower(cfg.PrometheusBackend),
 		TSDBAdminToolsEnabled: cfg.TSDBAdminToolsEnabled,
+	}
+	if _, ok := toolset["runbooks_list"]; ok {
+		for _, def := range runbookDefs {
+			data.Runbooks = append(data.Runbooks, instructionsRunbook{
+				Name:    def.Name,
+				Trigger: descriptionTrigger(def.Description),
+			})
+		}
 	}
 
 	var buf bytes.Buffer

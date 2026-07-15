@@ -64,14 +64,47 @@ func TestRenderInstructions(t *testing.T) {
 		require.NotContains(t, instrx, "Any Prometheus-API-compatible backend")
 	})
 
-	t.Run("runbooks pointer follows toolset", func(t *testing.T) {
+	t.Run("runbooks inventory follows toolset", func(t *testing.T) {
 		instrx, err := renderInstructions(ServerConfig{}, fullToolset)
 		require.NoError(t, err)
 		require.Contains(t, instrx, "runbooks_list")
+		for _, def := range runbookDefs {
+			require.Contains(t, instrx, "- "+def.Name+": "+descriptionTrigger(def.Description), "runbook %q missing from the instructions inventory", def.Name)
+		}
 
 		instrx, err = renderInstructions(ServerConfig{}, map[string]toolRegistration{})
 		require.NoError(t, err)
 		require.NotContains(t, instrx, "runbooks_list")
+		require.NotContains(t, instrx, "Runbooks --")
+		require.NotContains(t, instrx, "docs_search")
+	})
+
+	t.Run("stays within client instruction limits", func(t *testing.T) {
+		// Claude Code truncates each server's instructions at 2KB; the
+		// runbook inventory must never push the render past that in any
+		// configuration. If this fails after adding a runbook, shorten
+		// the leading description sentences or trim other sections.
+		for name, tc := range map[string]struct {
+			cfg     ServerConfig
+			toolset map[string]toolRegistration
+		}{
+			"default":       {ServerConfig{}, fullToolset},
+			"admin enabled": {ServerConfig{TSDBAdminToolsEnabled: true}, fullToolset},
+			"thanos":        {ServerConfig{PrometheusBackend: "thanos"}, thanosBackendToolset},
+			"empty toolset": {ServerConfig{}, map[string]toolRegistration{}},
+		} {
+			instrx, err := renderInstructions(tc.cfg, tc.toolset)
+			require.NoError(t, err, "variant %s", name)
+			require.LessOrEqual(t, len(instrx), 2048, "variant %s renders %d bytes, over the 2KB client cap", name, len(instrx))
+		}
+
+		// OpenAI Codex surfaces instructions as the tool namespace
+		// description and recommends a self-contained first 512
+		// characters; keep the embedded-content pointers early.
+		instrx, err := renderInstructions(ServerConfig{}, fullToolset)
+		require.NoError(t, err)
+		require.Contains(t, instrx[:512], "runbooks_list")
+		require.Contains(t, instrx[:512], "docs_search")
 	})
 
 	t.Run("no backend renders generic compatibility note", func(t *testing.T) {

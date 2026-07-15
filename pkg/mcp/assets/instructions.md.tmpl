@@ -1,45 +1,30 @@
-Prometheus MCP server: query and manage a running Prometheus{{ if .Backend }} ({{ .Backend }} backend){{ end }} instance via PromQL, discovery/metadata endpoints, and management APIs, plus embedded official Prometheus documentation.
+Prometheus MCP server: query and manage a running Prometheus{{ if .Backend }} ({{ .Backend }} backend){{ end }} instance via PromQL, discovery/metadata endpoints, and management APIs.{{ if hasTool "docs_search" }} Official Prometheus docs are embedded (docs_search tool, prometheus://docs resources).{{ end }}{{ if .Runbooks }} Guided runbooks are embedded (runbooks_list tool; also exposed as prompts and skill:// resources).{{ end }}
 
 Core rules:
-- Use the tools to fetch live data. Never answer from assumed state or invent query results; execute queries unless the user explicitly asks for an example only.
-- Never assume a metric or label name exists. Users often mistype or misremember names — discover and verify first.
-- ALWAYS confirm with the user before calling destructive or state-changing tools (see tool descriptions for specifics).
+- Use the tools to fetch live data; never invent query results or answer from assumed state.
+- Never assume a metric or label name exists: discover with label_values (label="__name__"), metric_metadata, or series, then build queries from verified names.
+- Keep results small: aggregate and filter in PromQL, and cap output with the truncation_limit parameter that query and list tools accept.
+{{- if hasTool "docs_search" }}
+- If you are unsure how something in Prometheus works (PromQL, configuration, internals), try docs_search before searching externally.
+{{- end }}
+- ALWAYS confirm with the user before calling destructive or state-changing tools (see tool descriptions).
 {{- if hasTool "delete_series" }}
 {{- if .TSDBAdminToolsEnabled }}
-- TSDB admin tools (delete_series, clean_tombstones, snapshot) are enabled, but also require the Prometheus instance flag `--web.enable-admin-api`; calls will fail if Prometheus hasn't enabled it.
+- TSDB admin tools also require the Prometheus flag --web.enable-admin-api; calls fail if it is not set.
 {{- else }}
-- TSDB admin tools (delete_series, clean_tombstones, snapshot) are disabled on this server; calls to them will fail unless it is restarted with `--dangerous.enable-tsdb-admin-tools`. Do not attempt them unless the user confirms the flag is enabled.
+- TSDB admin tools (delete_series, clean_tombstones, snapshot) are disabled on this server; do not call them unless it is restarted with --dangerous.enable-tsdb-admin-tools.
 {{- end }}
 {{- end }}
 {{- if .Backend }}
-- This server is configured for the "{{ .Backend }}" backend; the available toolset has been tailored accordingly.
+- This server is configured for the "{{ .Backend }}" backend; the toolset is tailored accordingly.
 {{- else }}
-- Any Prometheus-API-compatible backend (Thanos, Cortex, Mimir, VictoriaMetrics, ...) may be on the other side; endpoints a backend doesn't implement will return errors. Use build_info to identify the backend.
+- Any Prometheus-API-compatible backend (Thanos, Mimir, ...) may be behind this server; use build_info to identify it.
 {{- end }}
+{{- if .Runbooks }}
 
-Discovery workflow (before any non-trivial query):
-1. Find metrics: label_values with label="__name__", or metric_metadata for types, units, and descriptions.
-2. Find a metric's labels: series with matches, or label_names / label_values for specific labels.
-3. Build the query from verified names, run it, and briefly explain what it does.
-If the user's request is ambiguous (e.g. "show me CPU usage"), present the discovered candidate metrics before querying.
-
-Querying:
-- query returns one value per series at a single point in time; range_query returns values over a window (graphing, trends). If the user gives no time range for range_query, use a sensible default (e.g. 1h) and say so.
-- Prefer rate() for counters; irate() is only for graphing short-term spikes, never for alerting or recording rules. Take rate() before sum(), never the reverse.
-- Aggregate high-cardinality metrics, or bound output with topk()/bottomk() and the truncation_limit parameter, instead of returning raw series.
-- Check list_rules for existing recording rules before repeatedly computing complex expressions.
-
-Troubleshooting:
-- Empty results: verify the metric exists, then check the time range and label matchers (watch case sensitivity).
-- PromQL syntax errors: consult docs_search for correct syntax.
-- Slow or timed-out queries: reduce the time range, add aggregation, use a larger step, or check tsdb_stats for cardinality issues.
-- Explain what went wrong and how you're adjusting your approach.
-
-Documentation:
-- The official Prometheus documentation is embedded in the server (docs_list, docs_read, docs_search) and available without network access. Treat it as authoritative, search it before complex operations, and cite the source file when you rely on it.
-{{- if hasTool "runbooks_list" }}
-
-Runbooks:
-- Step-by-step runbooks for common workflows — error-rate investigation, missing-data triage, system health checks, high-cardinality optimization, recording/alerting rule review, and configuration tuning — are embedded in this server. When a request matches one of these tasks, list them with runbooks_list, read the matching runbook with runbooks_read, and follow its steps.
-- Each runbook is also exposed as an MCP prompt of the same task name, for clients with prompt support.
+Runbooks -- read with runbooks_read or the skill://<name>/SKILL.md resource, and follow when a task matches:
+{{- range .Runbooks }}
+- {{ .Name }}: {{ .Trigger }}
+{{- end }}
+Each runbook is also available as an MCP prompt.
 {{- end }}
