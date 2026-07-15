@@ -88,9 +88,9 @@ Please see [Flags](#command-line-flags) for more information on the available fl
 | `list_rules` | List all alerting and recording rules that are loaded |
 | `list_targets` | Get overview of Prometheus target discovery |
 | `metric_metadata` | Returns metadata about metrics currently scraped by the metric name | 
-| `query` | Execute an instant query against the Prometheus datasource |
+| `query` | Execute an instant query against the Prometheus datasource, returning one value per series at a single point in time |
 | `quit` | Management API endpoint that can be used to trigger a graceful shutdown of Prometheus |
-| `range_query` | Execute a range query against the Prometheus datasource |
+| `range_query` | Execute a range query against the Prometheus datasource, returning values over a time window |
 | `ready` | Management API endpoint that can be used to check Prometheus is ready to serve traffic (i.e. respond to queries |
 | `reload` | Management API endpoint that can be used to trigger a reload of the Prometheus configuration and rule files |
 | `runtime_info` | Get Prometheus runtime information |

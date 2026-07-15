@@ -128,17 +128,25 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 		logger = promslog.NewNopLogger()
 	}
 
-	// Load instructions from embedded assets.
-	coreInstructions, err := assets.ReadFile("assets/instructions.md")
-	if err != nil {
-		logger.Error("Failed to read instructions from embedded assets", "err", err)
-		coreInstructions = []byte("Prometheus MCP Server")
-	}
-	instrx := string(coreInstructions)
-
 	container, err := newServerContainer(cfg)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Select the appropriate toolset based on configuration.
+	toolsetMap := getToolset(toolsetConfig{
+		enabledTools:      cfg.EnabledTools,
+		prometheusBackend: cfg.PrometheusBackend,
+		logger:            logger,
+	})
+	toolset := toolsetToToolRegistrationSlice(toolsetMap)
+
+	// A render failure falls back to a bare server name: instructions are
+	// worth having but not worth failing startup over.
+	instrx, err := renderInstructions(cfg, toolsetMap)
+	if err != nil {
+		logger.Error("Failed to render server instructions", "err", err)
+		instrx = "Prometheus MCP Server"
 	}
 
 	server := mcp.NewServer(
@@ -153,14 +161,6 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 			KeepAlive:    cfg.KeepAlive,
 		},
 	)
-
-	// Select the appropriate toolset based on configuration.
-	toolsetMap := getToolset(toolsetConfig{
-		enabledTools:      cfg.EnabledTools,
-		prometheusBackend: cfg.PrometheusBackend,
-		logger:            logger,
-	})
-	toolset := toolsetToToolRegistrationSlice(toolsetMap)
 
 	// Register tools.
 	registerTools(server, container, toolset)

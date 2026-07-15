@@ -32,7 +32,7 @@ type TimeRangeInput struct {
 
 // TruncatableInput provides optional truncation limit for query responses.
 type TruncatableInput struct {
-	TruncationLimit int `json:"truncation_limit,omitempty" jsonschema:"truncation limit for query response in number of lines/entries, set to -1 to disable truncation"`
+	TruncationLimit int `json:"truncation_limit,omitempty" jsonschema:"truncation limit for query response in number of lines/entries; use lower limits (e.g. 50-100) for initial exploration, set to -1 to disable truncation"`
 }
 
 // Tool definition structs

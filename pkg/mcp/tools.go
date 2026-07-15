@@ -39,7 +39,7 @@ func ptr[T any](v T) *T {
 var (
 	queryToolDef = &mcp.Tool{
 		Name:        "query",
-		Description: "Execute an instant query against the Prometheus datasource",
+		Description: "Execute an instant query against the Prometheus datasource, returning one value per series at a single point in time",
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "Instant Query",
 			ReadOnlyHint: true,
@@ -48,7 +48,7 @@ var (
 
 	rangeQueryToolDef = &mcp.Tool{
 		Name:        "range_query",
-		Description: "Execute a range query against the Prometheus datasource",
+		Description: "Execute a range query against the Prometheus datasource, returning values over a time window; use for graphing and trend analysis",
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "Range Query",
 			ReadOnlyHint: true,
@@ -212,7 +212,7 @@ var (
 	// TSDB Admin tools.
 	cleanTombstonesToolDef = &mcp.Tool{
 		Name:        "clean_tombstones",
-		Description: "Removes the deleted data from disk and cleans up the existing tombstones",
+		Description: "Removes the deleted data from disk and cleans up the existing tombstones. I/O- and CPU-intensive; prefer low-traffic periods and confirm with the user before calling.",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Clean Tombstones",
@@ -222,7 +222,7 @@ var (
 
 	deleteSeriesToolDef = &mcp.Tool{
 		Name:        "delete_series",
-		Description: "Deletes data for a selection of series in a time range. Both start_time and end_time are required to prevent accidental deletion of all data. Deletion creates tombstones; run clean_tombstones or wait for compaction to reclaim disk space.",
+		Description: "Deletes data for a selection of series in a time range. Both start_time and end_time are required to prevent accidental deletion of all data. Deletion creates tombstones; run clean_tombstones or wait for compaction to reclaim disk space. Confirm the time range and matchers with the user before calling.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Delete Series",
 			DestructiveHint: ptr(true),
@@ -231,7 +231,7 @@ var (
 
 	snapshotToolDef = &mcp.Tool{
 		Name:        "snapshot",
-		Description: "creates a snapshot of all current data into snapshots/<datetime>-<rand> under the TSDB's data directory and returns the directory as response.",
+		Description: "creates a snapshot of all current data into snapshots/<datetime>-<rand> under the TSDB's data directory and returns the directory as response. Safe, but confirm with the user before calling.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Create Snapshot",
 			DestructiveHint: ptr(true),
@@ -261,7 +261,7 @@ var (
 
 	reloadToolDef = &mcp.Tool{
 		Name:        "reload",
-		Description: "Management API endpoint that can be used to trigger a reload of the Prometheus configuration and rule files.",
+		Description: "Management API endpoint that can be used to trigger a reload of the Prometheus configuration and rule files. Safe; applies changes without downtime.",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Reload Config",
@@ -271,7 +271,7 @@ var (
 
 	quitToolDef = &mcp.Tool{
 		Name:        "quit",
-		Description: "Management API endpoint that can be used to trigger a graceful shutdown of Prometheus.",
+		Description: "Management API endpoint that can be used to trigger a graceful shutdown of Prometheus. Only call this when the user explicitly requests a shutdown.",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Shutdown",
