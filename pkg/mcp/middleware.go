@@ -28,6 +28,8 @@ const (
 	methodInitialize    = "initialize"
 	methodToolsCall     = "tools/call"
 	methodResourcesRead = "resources/read"
+	methodPromptsGet    = "prompts/get"
+	methodPromptsList   = "prompts/list"
 )
 
 // telemetryMiddleware creates an MCP middleware that instruments MCP method
@@ -42,6 +44,10 @@ func telemetryMiddleware(logger *slog.Logger) mcp.Middleware {
 				return telemetryHandleToolCall(ctx, method, req, next, logger)
 			case methodResourcesRead:
 				return telemetryHandleResourceRead(ctx, method, req, next, logger)
+			case methodPromptsGet:
+				return telemetryHandlePromptGet(ctx, method, req, next, logger)
+			case methodPromptsList:
+				return telemetryHandlePromptList(ctx, method, req, next, logger)
 			}
 
 			// If no supported method matches, run handler directly
@@ -125,6 +131,58 @@ func telemetryHandleToolCall(ctx context.Context, method string, req mcp.Request
 	if err != nil || toolResult.IsError {
 		metricToolCallsFailed.With(prometheus.Labels{"tool_name": toolName}).Inc()
 		logger.Error("Failed calling tool", "result", result, "error", err)
+	}
+
+	return result, err
+}
+
+// telemetryHandlePromptGet instruments a prompts/get request with metrics and logging.
+func telemetryHandlePromptGet(ctx context.Context, method string, req mcp.Request, next mcp.MethodHandler, logger *slog.Logger) (mcp.Result, error) {
+	params, ok := req.GetParams().(*mcp.GetPromptParams)
+	if !ok {
+		// Can't extract prompt info, pass through without instrumentation.
+		logger.Warn("Failed to extract prompt params for telemetry", "method", method)
+		return next(ctx, method, req)
+	}
+
+	promptName := params.Name
+	logger = logger.With("prompt_name", promptName)
+
+	logger.Debug("Calling prompt")
+
+	startTime := time.Now()
+	result, err := next(ctx, method, req)
+	duration := time.Since(startTime)
+
+	metricPromptGetDuration.With(prometheus.Labels{"prompt_name": promptName}).Observe(duration.Seconds())
+	logger.Debug("Finished calling prompt", "duration", duration)
+
+	if err != nil {
+		metricPromptGetsFailed.With(prometheus.Labels{"prompt_name": promptName}).Inc()
+		logger.Error("Failed calling prompt", "result", result, "error", err)
+	}
+
+	return result, err
+}
+
+// telemetryHandlePromptList instruments a prompts/list request with metrics
+// and logging. Listings carry no parameters, so the metrics are unlabelled.
+func telemetryHandlePromptList(ctx context.Context, method string, req mcp.Request, next mcp.MethodHandler, logger *slog.Logger) (mcp.Result, error) {
+	logger.Debug("Listing prompts")
+
+	startTime := time.Now()
+	result, err := next(ctx, method, req)
+	duration := time.Since(startTime)
+
+	metricPromptListDuration.Observe(duration.Seconds())
+	if listResult, ok := result.(*mcp.ListPromptsResult); ok {
+		logger = logger.With("prompt_count", len(listResult.Prompts))
+	}
+	logger.Debug("Finished listing prompts", "duration", duration)
+
+	if err != nil {
+		metricPromptListsFailed.Inc()
+		logger.Error("Failed listing prompts", "result", result, "error", err)
 	}
 
 	return result, err

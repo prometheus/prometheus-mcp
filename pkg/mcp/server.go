@@ -93,6 +93,40 @@ var (
 		},
 		[]string{"resource_uri"},
 	)
+
+	metricPromptGetDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:                        prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "get_duration_seconds"),
+			Help:                        "Duration of prompt get requests, per prompt, in seconds.",
+			Buckets:                     prometheus.ExponentialBuckets(0.25, 2, 10),
+			NativeHistogramBucketFactor: 1.1,
+		},
+		[]string{"prompt_name"},
+	)
+
+	metricPromptGetsFailed = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "gets_failed_total"),
+			Help: "Total number of failures per prompt.",
+		},
+		[]string{"prompt_name"},
+	)
+
+	metricPromptListDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:                        prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "list_duration_seconds"),
+			Help:                        "Duration of prompt list requests, in seconds.",
+			Buckets:                     prometheus.ExponentialBuckets(0.25, 2, 10),
+			NativeHistogramBucketFactor: 1.1,
+		},
+	)
+
+	metricPromptListsFailed = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "lists_failed_total"),
+			Help: "Total number of prompt list request failures.",
+		},
+	)
 )
 
 func init() {
@@ -102,6 +136,10 @@ func init() {
 		metricToolCallsFailed,
 		metricResourceCallDuration,
 		metricResourceCallsFailed,
+		metricPromptGetDuration,
+		metricPromptGetsFailed,
+		metricPromptListDuration,
+		metricPromptListsFailed,
 	)
 }
 
@@ -149,6 +187,14 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 		instrx = "Prometheus MCP Server"
 	}
 
+	// Declare the SEP-2640 skills extension so skill-aware hosts can
+	// discover the skill:// resources. Logging is pinned explicitly
+	// because a non-nil Capabilities overrides the SDK's historical
+	// {"logging":{}} default; the remaining capabilities are still
+	// inferred from the registered features.
+	caps := &mcp.ServerCapabilities{Logging: &mcp.LoggingCapabilities{}}
+	caps.AddExtension(skillsExtensionCapability, nil)
+
 	server := mcp.NewServer(
 		&mcp.Implementation{
 			Name:    "prometheus-mcp",
@@ -159,6 +205,7 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 			Instructions: instrx,
 			Logger:       logger.WithGroup("go_sdk_logger"),
 			KeepAlive:    cfg.KeepAlive,
+			Capabilities: caps,
 		},
 	)
 
@@ -167,6 +214,9 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 
 	// Register resources.
 	registerResources(server, container)
+
+	// Register prompts.
+	registerPrompts(server)
 
 	// Add telemetry middleware for metrics and logging.
 	server.AddReceivingMiddleware(telemetryMiddleware(logger))

@@ -14,6 +14,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.17.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tmc/langchaingo v0.1.14
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -96,5 +97,4 @@ require (
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

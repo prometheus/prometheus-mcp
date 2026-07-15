@@ -605,6 +605,39 @@ func (s *ServerContainer) DocsSearchHandler(ctx context.Context, req *mcp.CallTo
 	return &mcp.CallToolResult{Content: content}, nil, nil
 }
 
+// Runbook tool handlers
+
+// RunbooksListHandler handles the runbooks list tool.
+func (s *ServerContainer) RunbooksListHandler(ctx context.Context, req *mcp.CallToolRequest, input EmptyInput) (*mcp.CallToolResult, any, error) {
+	return newToolTextResult(listRunbooks()), nil, nil
+}
+
+// RunbooksReadHandler handles the runbooks read tool. It serves the runbook
+// through its skill:// resource so tool results carry the canonical URI.
+func (s *ServerContainer) RunbooksReadHandler(ctx context.Context, req *mcp.CallToolRequest, input RunbooksReadInput) (*mcp.CallToolResult, any, error) {
+	if input.Name == "" {
+		return newToolErrorResult("name parameter is required"), nil, nil
+	}
+
+	// Validate against the registry before building a URI from the input.
+	if _, ok := getRunbookDef(input.Name); !ok {
+		return newToolErrorResult(fmt.Sprintf("unknown runbook %q; use runbooks_list to see available runbooks", input.Name)), nil, nil
+	}
+
+	resourceReq := &mcp.ReadResourceRequest{
+		Params: &mcp.ReadResourceParams{
+			URI: skillURI(input.Name),
+		},
+	}
+
+	resourceResult, err := s.SkillReadResourceHandler(ctx, resourceReq)
+	if err != nil {
+		return newToolErrorResult("failed reading runbook: " + err.Error()), nil, nil
+	}
+
+	return embedResourceContentsInToolResult(resourceResult, &mcp.CallToolResult{}), nil, nil
+}
+
 // Thanos-specific handlers
 
 // ThanosStoresHandler handles the Thanos list stores tool.

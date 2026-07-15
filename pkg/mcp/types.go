@@ -205,6 +205,18 @@ func (dri DocsReadInput) LogValue() slog.Value {
 	)
 }
 
+// RunbooksReadInput is the input for the runbooks read tool.
+type RunbooksReadInput struct {
+	Name string `json:"name" jsonschema:"the skill name of the runbook to read, as returned by runbooks_list (e.g. investigate-error-rates)"`
+}
+
+// LogValue implements slog.LogValuer.
+func (rri RunbooksReadInput) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("name", rri.Name),
+	)
+}
+
 // DocsSearchInput is the input for the docs search tool.
 type DocsSearchInput struct {
 	Query string `json:"query" jsonschema:"the query to search for in documentation"`

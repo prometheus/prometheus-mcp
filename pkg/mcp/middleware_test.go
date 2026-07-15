@@ -113,6 +113,32 @@ func TestTelemetryMiddleware_Routing(t *testing.T) {
 			wantLogged:     "Calling resource",
 			expectNextCall: true,
 		},
+		{
+			name:   "prompts/get method dispatches to prompt get handler",
+			method: methodPromptsGet,
+			req: mockRequest(&mcp.GetPromptParams{
+				Name: "check-system-health",
+			}),
+			nextResult: &mcp.GetPromptResult{
+				Messages: []*mcp.PromptMessage{
+					{Role: "user", Content: &mcp.TextContent{Text: "runbook"}},
+				},
+			},
+			nextErr:        nil,
+			wantLogged:     "Calling prompt",
+			expectNextCall: true,
+		},
+		{
+			name:   "prompts/list method dispatches to prompt list handler",
+			method: methodPromptsList,
+			req:    mockRequest(&mcp.ListPromptsParams{}),
+			nextResult: &mcp.ListPromptsResult{
+				Prompts: []*mcp.Prompt{{Name: "check-system-health"}},
+			},
+			nextErr:        nil,
+			wantLogged:     "Listing prompts",
+			expectNextCall: true,
+		},
 	}
 
 	for _, tc := range testCases {

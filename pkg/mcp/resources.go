@@ -42,6 +42,14 @@ var (
 		Description: "Read the named markdown file containing official Prometheus documentation from the prometheus/docs repo",
 		MIMEType:    "text/markdown",
 	}
+
+	skillsIndexResource = &mcp.Resource{
+		URI:         skillsIndexURI,
+		Name:        "skills-index",
+		Title:       "Agent Skills Discovery Index",
+		Description: "SEP-2640 discovery index of the Agent Skills (runbooks) embedded in this server",
+		MIMEType:    "application/json",
+	}
 )
 
 // registerResources registers all MCP resources with the server.
@@ -49,8 +57,22 @@ func registerResources(server *mcp.Server, container *ServerContainer) {
 	// Add static resources
 	server.AddResource(docsListResource, container.DocsListResourceHandler)
 
-	// Add resource template for reading specific doc files
+	// Add resource templates for reading specific doc files
 	server.AddResourceTemplate(docsReadResourceTemplate, container.DocsReadResourceHandler)
+
+	// Expose the embedded runbooks as Agent Skills per SEP-2640: one
+	// skill://<name>/SKILL.md resource per skill, plus the well-known
+	// discovery index.
+	for _, def := range runbookDefs {
+		server.AddResource(&mcp.Resource{
+			URI:         skillURI(def.Name),
+			Name:        def.Name,
+			Title:       def.Title,
+			Description: def.Description,
+			MIMEType:    "text/markdown",
+		}, container.SkillReadResourceHandler)
+	}
+	server.AddResource(skillsIndexResource, container.SkillsIndexResourceHandler)
 }
 
 // Resource handlers
@@ -68,6 +90,62 @@ func (s *ServerContainer) DocsListResourceHandler(ctx context.Context, req *mcp.
 				URI:      req.Params.URI,
 				MIMEType: "text/plain",
 				Text:     strings.Join(names, "\n"),
+			},
+		},
+	}, nil
+}
+
+// SkillsIndexResourceHandler serves the SEP-2640 skill discovery index.
+func (s *ServerContainer) SkillsIndexResourceHandler(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	index, err := buildSkillsIndex()
+	if err != nil {
+		return nil, err
+	}
+
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      req.Params.URI,
+				MIMEType: "application/json",
+				Text:     index,
+			},
+		},
+	}, nil
+}
+
+// SkillReadResourceHandler serves a runbook's SKILL.md content from its
+// skill://<name>/SKILL.md resource URI.
+func (s *ServerContainer) SkillReadResourceHandler(ctx context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	// Parse the URI to properly handle URL-encoded characters.
+	u, err := url.Parse(req.Params.URI)
+	if err != nil {
+		return nil, fmt.Errorf("invalid resource URI: %w", err)
+	}
+
+	// Validate scheme.
+	if u.Scheme != "skill" {
+		return nil, fmt.Errorf("invalid skill resource URI scheme: %s", u.Scheme)
+	}
+
+	// Only single-file skills are served.
+	if u.Path != "/SKILL.md" {
+		return nil, fmt.Errorf("invalid skill resource path %q: only SKILL.md files are served", u.Path)
+	}
+	if u.Host == "" {
+		return nil, errors.New("a skill name is required when reading skill resources")
+	}
+
+	content, err := getRunbookContent(u.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read runbook: %w", err)
+	}
+
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      req.Params.URI,
+				MIMEType: "text/markdown",
+				Text:     content,
 			},
 		},
 	}, nil

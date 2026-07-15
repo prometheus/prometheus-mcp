@@ -64,6 +64,16 @@ func TestRenderInstructions(t *testing.T) {
 		require.NotContains(t, instrx, "Any Prometheus-API-compatible backend")
 	})
 
+	t.Run("runbooks pointer follows toolset", func(t *testing.T) {
+		instrx, err := renderInstructions(ServerConfig{}, fullToolset)
+		require.NoError(t, err)
+		require.Contains(t, instrx, "runbooks_list")
+
+		instrx, err = renderInstructions(ServerConfig{}, map[string]toolRegistration{})
+		require.NoError(t, err)
+		require.NotContains(t, instrx, "runbooks_list")
+	})
+
 	t.Run("no backend renders generic compatibility note", func(t *testing.T) {
 		instrx, err := renderInstructions(ServerConfig{}, fullToolset)
 		require.NoError(t, err)

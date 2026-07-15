@@ -116,6 +116,20 @@ func (ts *TestServer) ListTools(ctx context.Context) (*mcp.ListToolsResult, erro
 	return ts.session.ListTools(ctx, &mcp.ListToolsParams{})
 }
 
+// ListPrompts returns the prompts registered on the server as seen through
+// the MCP protocol.
+func (ts *TestServer) ListPrompts(ctx context.Context) (*mcp.ListPromptsResult, error) {
+	return ts.session.ListPrompts(ctx, &mcp.ListPromptsParams{})
+}
+
+// GetPrompt fetches a prompt by name through the MCP protocol.
+func (ts *TestServer) GetPrompt(ctx context.Context, name string, args map[string]string) (*mcp.GetPromptResult, error) {
+	return ts.session.GetPrompt(ctx, &mcp.GetPromptParams{
+		Name:      name,
+		Arguments: args,
+	})
+}
+
 // Close shuts down the test server and releases resources.
 // This is automatically called via t.Cleanup(), but can be called
 // manually if needed.

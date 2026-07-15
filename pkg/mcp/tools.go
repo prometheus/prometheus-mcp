@@ -308,6 +308,26 @@ var (
 		},
 	}
 
+	// Runbook tools.
+	runbooksListToolDef = &mcp.Tool{
+		Name:        "runbooks_list",
+		Description: "List the runbooks embedded in this server: guided workflows (Agent Skills) for common Prometheus tasks - investigating error rates and alert spikes, finding top CPU/memory/disk consumers, troubleshooting missing metrics or empty query results, health-checking Prometheus, reducing high-cardinality metrics, reviewing and drafting recording and alerting rules, and tuning Prometheus configuration. Call this and read the matching runbook with runbooks_read before starting any of these tasks.",
+		InputSchema: emptyInputSchema,
+		Annotations: &mcp.ToolAnnotations{
+			Title:        "List Runbooks",
+			ReadOnlyHint: true,
+		},
+	}
+
+	runbooksReadToolDef = &mcp.Tool{
+		Name:        "runbooks_read",
+		Description: "Read the named runbook: a guided workflow (Agent Skill) for a common Prometheus task, expressed in terms of this server's tools. Follow its guidance when a user request matches a runbook's purpose; runbooks_list shows what is available.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:        "Read Runbook",
+			ReadOnlyHint: true,
+		},
+	}
+
 	// Thanos-specific tools.
 	thanosStoresToolDef = &mcp.Tool{
 		Name:        "list_stores",
