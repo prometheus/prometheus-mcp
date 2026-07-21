@@ -1,5 +1,8 @@
 ---
-# This action is synced from https://github.com/prometheus/prometheus
+# Originally synced from https://github.com/prometheus/prometheus, but this
+# copy carries a repo-specific step (the embedded docs snapshot must exist
+# before the linter can typecheck the go:embed directive), so it is
+# excluded from repo_sync: no_prometheus_repo_sync
 name: golangci-lint
 on:
   push:
@@ -33,9 +36,10 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: 1.26.x
-      - name: Install snmp_exporter/generator dependencies
-        run: sudo apt-get update && sudo apt-get -y install libsnmp-dev
-        if: github.repository == 'prometheus/snmp_exporter'
+      - name: Download embedded docs snapshot
+        # The binary embeds the prometheus/docs snapshot via go:embed; the linter
+        # compiles the packages, so it must be present.
+        run: make docs
       - name: Get golangci-lint version
         id: golangci-lint-version
         run: echo "version=$(make print-golangci-lint-version)" >> $GITHUB_OUTPUT

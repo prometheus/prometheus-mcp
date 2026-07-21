@@ -1,8 +1,11 @@
 ---
+# Customized for this repo (Helm chart templates and the embedded docs
+# snapshot are not lintable YAML); excluded from repo_sync: no_prometheus_repo_sync
 extends: default
 ignore: |
   **/node_modules
-  web/api/v1/testdata/openapi_*_golden.yaml
+  cmd/prometheus-mcp/external/docs/
+  charts/
 
 rules:
   braces:
@@ -18,9 +21,7 @@ rules:
   indentation:
     spaces: consistent
     indent-sequences: consistent
-  key-duplicates:
-    ignore: |
-      config/testdata/section_key_dup.bad.yml
+  key-duplicates: {}
   line-length: disable
   truthy:
     check-keys: false
