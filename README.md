@@ -88,11 +88,13 @@ Please see [Flags](#command-line-flags) for more information on the available fl
 | `list_rules` | List all alerting and recording rules that are loaded |
 | `list_targets` | Get overview of Prometheus target discovery |
 | `metric_metadata` | Returns metadata about metrics currently scraped by the metric name | 
-| `query` | Execute an instant query against the Prometheus datasource |
+| `query` | Execute an instant query against the Prometheus datasource, returning one value per series at a single point in time |
 | `quit` | Management API endpoint that can be used to trigger a graceful shutdown of Prometheus |
-| `range_query` | Execute a range query against the Prometheus datasource |
+| `range_query` | Execute a range query against the Prometheus datasource, returning values over a time window |
 | `ready` | Management API endpoint that can be used to check Prometheus is ready to serve traffic (i.e. respond to queries |
 | `reload` | Management API endpoint that can be used to trigger a reload of the Prometheus configuration and rule files |
+| `runbooks_list` | List the runbooks embedded in this server: guided workflows (Agent Skills) for common Prometheus tasks |
+| `runbooks_read` | Read the named runbook by skill name (e.g. `check-system-health`) |
 | `runtime_info` | Get Prometheus runtime information |
 | `series` | Finds series by label matchers |
 | `targets_metadata` | Returns metadata about metrics currently scraped by the target |
@@ -118,7 +120,7 @@ The server exposes many tools to interact with Prometheus. There are tools to in
 By default, they are all registered and available for use (TSDB Admin API tools need an extra flag).
 
 To be considerate to LLMs with smaller context windows, it's possible to pass in a whitelist of specific tools to register with the server.
-The following 'core' tools are always loaded: `[docs_list, docs_read, docs_search, query, range_query, metric_metadata, label_names, label_values, series]`.
+The following 'core' tools are always loaded: `[docs_list, docs_read, docs_search, runbooks_list, runbooks_read, query, range_query, metric_metadata, label_names, label_values, series]`.
 Additional tools can be specified with the [`--mcp.tools` flag](#command-line-flags).
 
 For example, the command line:
@@ -139,8 +141,22 @@ Would result in the following tools being loaded:
 - `metric_metadata`
 - `query`
 - `range_query`
+- `runbooks_list`
+- `runbooks_read`
 - `runtime_info`
 - `series`
+
+#### Runbooks (Agent Skills) and Prompts
+
+The server embeds a set of runbooks: guided workflows for common Prometheus tasks, expressed in terms of the server's tools. Each runbook orients the model on the relevant tools, then suggests topics to explore with example queries rather than prescribing a fixed sequence of steps.
+Runbooks cover tasks like system health checks, missing-data triage, error-rate investigation, high-cardinality optimization, recording/alerting rule review, and configuration/performance tuning.
+
+Each runbook is packaged as a full [Agent Skill](https://agentskills.io/specification): a directory containing a `SKILL.md` with `name`/`description` frontmatter.
+Runbooks are exposed three ways:
+
+- **Tools**: the model can discover and read them itself via the `runbooks_list`/`runbooks_read` tools when a request matches a runbook's purpose. Tools are the most portable path and work in every MCP client.
+- **Skill resources**: per the [SEP-2640 skills extension draft](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640), each runbook is a `skill://<name>/SKILL.md` resource, enumerated by the well-known `skill://index.json` discovery index, and the server declares the `io.modelcontextprotocol/skills` extension capability. Skill-aware hosts can consume these like local filesystem skills; other clients can still read them as ordinary MCP resources.
+- **MCP prompts**: each runbook is also registered as an [MCP prompt](https://modelcontextprotocol.io/docs/concepts/prompts) under its skill name (e.g. `check-system-health`, `optimize-high-cardinality`), so clients with prompt support can invoke a guided workflow directly (often surfaced as slash commands).
 
 #### Prometheus Compatible Backends
 
@@ -181,6 +197,8 @@ Qualifications and support criteria are still under consideration, please open a
 | --- | --- | --- |
 | List of Official Prometheus Documentation Files | `prometheus://docs` | List of official Prometheus Documentation files |
 | Read Official Prometheus Documentation | `prometheus://docs/{+file}` | Read official Prometheus Documentation files by name |
+| Agent Skills Discovery Index | `skill://index.json` | [SEP-2640](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2640) discovery index of the embedded runbooks/skills |
+| Prometheus Runbook (Agent Skill) | `skill://<name>/SKILL.md` | Read the named runbook, packaged as an Agent Skill (one resource per runbook) |
 
 ## Installation and Usage
 
@@ -411,7 +429,7 @@ Flags:
       --mcp.tools=all ...        List of mcp tools to load. The target
                                  `all` can be used to load all tools.
                                  The target `core` loads only the core tools:
-                                 docs_list,docs_read,docs_search,query,range_query,metric_metadata,label_names,label_values,series
+                                 docs_list,docs_read,docs_search,runbooks_list,runbooks_read,query,range_query,metric_metadata,label_names,label_values,series
                                  Otherwise, it is treated as an allow-list
                                  of tools to load, in addition to the core
                                  tools. Please see project README for more

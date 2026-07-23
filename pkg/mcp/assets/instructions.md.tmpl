@@ -1,0 +1,30 @@
+Prometheus MCP server: query and manage a running Prometheus{{ if .Backend }} ({{ .Backend }} backend){{ end }} instance via PromQL, discovery/metadata endpoints, and management APIs.{{ if hasTool "docs_search" }} Official Prometheus docs are embedded (docs_search tool, prometheus://docs resources).{{ end }}{{ if .Runbooks }} Guided runbooks are embedded (runbooks_list tool; also exposed as prompts and skill:// resources).{{ end }}
+
+Core rules:
+- Use the tools to fetch live data; never invent query results or answer from assumed state.
+- Never assume a metric or label name exists: discover with label_values (label="__name__"), metric_metadata, or series, then build queries from verified names.
+- Keep results small: aggregate and filter in PromQL, and cap output with the truncation_limit parameter that query and list tools accept.
+{{- if hasTool "docs_search" }}
+- If you are unsure how something in Prometheus works (PromQL, configuration, internals), try docs_search before searching externally.
+{{- end }}
+- ALWAYS confirm with the user before calling destructive or state-changing tools (see tool descriptions).
+{{- if hasTool "delete_series" }}
+{{- if .TSDBAdminToolsEnabled }}
+- TSDB admin tools also require the Prometheus flag --web.enable-admin-api; calls fail if it is not set.
+{{- else }}
+- TSDB admin tools (delete_series, clean_tombstones, snapshot) are disabled on this server; do not call them unless it is restarted with --dangerous.enable-tsdb-admin-tools.
+{{- end }}
+{{- end }}
+{{- if .Backend }}
+- This server is configured for the "{{ .Backend }}" backend; the toolset is tailored accordingly.
+{{- else }}
+- Any Prometheus-API-compatible backend (Thanos, Mimir, ...) may be behind this server; use build_info to identify it.
+{{- end }}
+{{- if .Runbooks }}
+
+Runbooks -- read with runbooks_read or the skill://<name>/SKILL.md resource, and follow when a task matches:
+{{- range .Runbooks }}
+- {{ .Name }}: {{ .Trigger }}
+{{- end }}
+Each runbook is also available as an MCP prompt.
+{{- end }}

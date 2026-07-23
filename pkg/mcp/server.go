@@ -93,6 +93,40 @@ var (
 		},
 		[]string{"resource_uri"},
 	)
+
+	metricPromptGetDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:                        prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "get_duration_seconds"),
+			Help:                        "Duration of prompt get requests, per prompt, in seconds.",
+			Buckets:                     prometheus.ExponentialBuckets(0.25, 2, 10),
+			NativeHistogramBucketFactor: 1.1,
+		},
+		[]string{"prompt_name"},
+	)
+
+	metricPromptGetsFailed = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "gets_failed_total"),
+			Help: "Total number of failures per prompt.",
+		},
+		[]string{"prompt_name"},
+	)
+
+	metricPromptListDuration = prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:                        prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "list_duration_seconds"),
+			Help:                        "Duration of prompt list requests, in seconds.",
+			Buckets:                     prometheus.ExponentialBuckets(0.25, 2, 10),
+			NativeHistogramBucketFactor: 1.1,
+		},
+	)
+
+	metricPromptListsFailed = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: prometheus.BuildFQName(metrics.MetricNamespace, "prompt", "lists_failed_total"),
+			Help: "Total number of prompt list request failures.",
+		},
+	)
 )
 
 func init() {
@@ -102,6 +136,10 @@ func init() {
 		metricToolCallsFailed,
 		metricResourceCallDuration,
 		metricResourceCallsFailed,
+		metricPromptGetDuration,
+		metricPromptGetsFailed,
+		metricPromptListDuration,
+		metricPromptListsFailed,
 	)
 }
 
@@ -128,18 +166,34 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 		logger = promslog.NewNopLogger()
 	}
 
-	// Load instructions from embedded assets.
-	coreInstructions, err := assets.ReadFile("assets/instructions.md")
-	if err != nil {
-		logger.Error("Failed to read instructions from embedded assets", "err", err)
-		coreInstructions = []byte("Prometheus MCP Server")
-	}
-	instrx := string(coreInstructions)
-
 	container, err := newServerContainer(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// Select the appropriate toolset based on configuration.
+	toolsetMap := getToolset(toolsetConfig{
+		enabledTools:      cfg.EnabledTools,
+		prometheusBackend: cfg.PrometheusBackend,
+		logger:            logger,
+	})
+	toolset := toolsetToToolRegistrationSlice(toolsetMap)
+
+	// A render failure falls back to a bare server name: instructions are
+	// worth having but not worth failing startup over.
+	instrx, err := renderInstructions(cfg, toolsetMap)
+	if err != nil {
+		logger.Error("Failed to render server instructions", "err", err)
+		instrx = "Prometheus MCP Server"
+	}
+
+	// Declare the SEP-2640 skills extension so skill-aware hosts can
+	// discover the skill:// resources. Logging is pinned explicitly
+	// because a non-nil Capabilities overrides the SDK's historical
+	// {"logging":{}} default; the remaining capabilities are still
+	// inferred from the registered features.
+	caps := &mcp.ServerCapabilities{Logging: &mcp.LoggingCapabilities{}}
+	caps.AddExtension(skillsExtensionCapability, nil)
 
 	server := mcp.NewServer(
 		&mcp.Implementation{
@@ -151,22 +205,18 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 			Instructions: instrx,
 			Logger:       logger.WithGroup("go_sdk_logger"),
 			KeepAlive:    cfg.KeepAlive,
+			Capabilities: caps,
 		},
 	)
-
-	// Select the appropriate toolset based on configuration.
-	toolsetMap := getToolset(toolsetConfig{
-		enabledTools:      cfg.EnabledTools,
-		prometheusBackend: cfg.PrometheusBackend,
-		logger:            logger,
-	})
-	toolset := toolsetToToolRegistrationSlice(toolsetMap)
 
 	// Register tools.
 	registerTools(server, container, toolset)
 
 	// Register resources.
 	registerResources(server, container)
+
+	// Register prompts.
+	registerPrompts(server)
 
 	// Add telemetry middleware for metrics and logging.
 	server.AddReceivingMiddleware(telemetryMiddleware(logger))

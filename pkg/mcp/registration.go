@@ -36,6 +36,8 @@ var (
 		"docs_list",
 		"docs_read",
 		"docs_search",
+		"runbooks_list",
+		"runbooks_read",
 		"query",
 		"range_query",
 		"metric_metadata",
@@ -242,6 +244,19 @@ func initPrometheusToolset() {
 			tool: docsSearchToolDef,
 			register: func(s *mcp.Server, c *ServerContainer) {
 				mcp.AddTool(s, docsSearchToolDef, c.DocsSearchHandler)
+			},
+		},
+		// Runbook tools
+		"runbooks_list": {
+			tool: runbooksListToolDef,
+			register: func(s *mcp.Server, c *ServerContainer) {
+				mcp.AddTool(s, runbooksListToolDef, c.RunbooksListHandler)
+			},
+		},
+		"runbooks_read": {
+			tool: runbooksReadToolDef,
+			register: func(s *mcp.Server, c *ServerContainer) {
+				mcp.AddTool(s, runbooksReadToolDef, c.RunbooksReadHandler)
 			},
 		},
 	}

@@ -2923,6 +2923,160 @@ func TestDocsReadResourceHandler(t *testing.T) {
 	}
 }
 
+// Runbook Handler Tests
+
+func TestRunbooksListHandler(t *testing.T) {
+	t.Parallel()
+
+	container := newTestContainer(&MockPrometheusAPI{})
+
+	ts := mcptest.NewTestServer(t)
+	mcptest.AddTool(ts, runbooksListToolDef, container.RunbooksListHandler)
+
+	result, err := ts.CallTool(ts.Context(), "runbooks_list", map[string]any{})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+
+	resultText := mcptest.GetResultText(result)
+	for _, def := range runbookDefs {
+		require.Contains(t, resultText, def.Name)
+		require.Contains(t, resultText, def.Description)
+	}
+}
+
+func TestRunbooksReadHandler(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name           string
+		args           map[string]any
+		validateResult func(t *testing.T, result string, isError bool, err error)
+	}{
+		{
+			name: "success - reads runbook content",
+			args: map[string]any{"name": "check-system-health"},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "# Understanding System Health")
+				require.Contains(t, result, "list_alerts")
+			},
+		},
+		{
+			name: "empty name parameter",
+			args: map[string]any{"name": ""},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.True(t, isError)
+				require.Contains(t, result, "name parameter is required")
+			},
+		},
+		{
+			name: "runbook not found",
+			args: map[string]any{"name": "nonexistent-skill"},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.True(t, isError)
+				require.Contains(t, result, "unknown runbook")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			container := newTestContainer(&MockPrometheusAPI{})
+
+			ts := mcptest.NewTestServer(t)
+			mcptest.AddTool(ts, runbooksReadToolDef, container.RunbooksReadHandler)
+
+			result, err := ts.CallTool(ts.Context(), "runbooks_read", tc.args)
+
+			resultText := mcptest.GetResultText(result)
+			isError := result != nil && result.IsError
+			tc.validateResult(t, resultText, isError, err)
+		})
+	}
+}
+
+func TestSkillsIndexResourceHandler(t *testing.T) {
+	t.Parallel()
+
+	container := newTestContainer(&MockPrometheusAPI{})
+
+	req := &mcpsdk.ReadResourceRequest{
+		Params: &mcpsdk.ReadResourceParams{URI: skillsIndexURI},
+	}
+	result, err := container.SkillsIndexResourceHandler(context.Background(), req)
+	require.NoError(t, err)
+	require.Len(t, result.Contents, 1)
+	require.Equal(t, "application/json", result.Contents[0].MIMEType)
+
+	var index skillsIndex
+	require.NoError(t, json.Unmarshal([]byte(result.Contents[0].Text), &index))
+	require.Equal(t, skillsIndexSchema, index.Schema)
+	require.Len(t, index.Skills, len(runbookDefs))
+	for i, def := range runbookDefs {
+		require.Equal(t, def.Name, index.Skills[i].Name)
+		require.Equal(t, "skill-md", index.Skills[i].Type)
+		require.Equal(t, def.Description, index.Skills[i].Description)
+		require.Equal(t, skillURI(def.Name), index.Skills[i].URL)
+	}
+}
+
+func TestSkillReadResourceHandler(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		uri            string
+		validateResult func(t *testing.T, result *mcpsdk.ReadResourceResult, err error)
+	}{
+		{
+			name: "success - reads SKILL.md by skill URI",
+			uri:  "skill://check-system-health/SKILL.md",
+			validateResult: func(t *testing.T, result *mcpsdk.ReadResourceResult, err error) {
+				require.NoError(t, err)
+				require.Len(t, result.Contents, 1)
+				require.Equal(t, "text/markdown", result.Contents[0].MIMEType)
+				require.Contains(t, result.Contents[0].Text, "name: check-system-health")
+				require.Contains(t, result.Contents[0].Text, "# Understanding System Health")
+			},
+		},
+		{
+			name: "invalid scheme is rejected",
+			uri:  "prometheus://check-system-health/SKILL.md",
+			validateResult: func(t *testing.T, result *mcpsdk.ReadResourceResult, err error) {
+				require.ErrorContains(t, err, "invalid skill resource URI scheme")
+			},
+		},
+		{
+			name: "non-SKILL.md path is rejected",
+			uri:  "skill://check-system-health/other.md",
+			validateResult: func(t *testing.T, result *mcpsdk.ReadResourceResult, err error) {
+				require.ErrorContains(t, err, "only SKILL.md files are served")
+			},
+		},
+		{
+			name: "unknown skill returns error",
+			uri:  "skill://nonexistent-skill/SKILL.md",
+			validateResult: func(t *testing.T, result *mcpsdk.ReadResourceResult, err error) {
+				require.ErrorContains(t, err, "unknown runbook")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			container := newTestContainer(&MockPrometheusAPI{})
+
+			req := &mcpsdk.ReadResourceRequest{
+				Params: &mcpsdk.ReadResourceParams{URI: tc.uri},
+			}
+			result, err := container.SkillReadResourceHandler(context.Background(), req)
+			tc.validateResult(t, result, err)
+		})
+	}
+}
+
 // TestQueryHandlerTimeFormats tests that the query handler correctly parses
 // various timestamp formats that LLMs commonly use.
 func TestQueryHandlerTimeFormats(t *testing.T) {
