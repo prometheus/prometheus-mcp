@@ -81,3 +81,35 @@ jobs:
           ghcr_io_password: ${{ github.token }}
           quay_io_password: ${{ secrets.quay_io_password }}
           github_token: ${{ github.token }}
+
+  publish_mcp_registry:
+    name: Publish to MCP registry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # OIDC auth to the MCP registry (io.github.prometheus/* namespace)
+    # The registry validates the OCI package by pulling the image and checking
+    # its io.modelcontextprotocol.server.name label, so the release images must
+    # already be pushed.
+    needs: [publish_release]
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Install mcp-publisher
+        # Pinned publisher CLI release from https://github.com/modelcontextprotocol/registry/releases
+        run: curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.0/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+      - name: Render server.json version
+        # promci pushes release images tagged with the raw (v-prefixed) git
+        # tag; the registry version is the bare semver, so server.json
+        # references the image as v${VERSION}.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -i "s/\${VERSION}/${version}/g" server.json
+          python3 -m json.tool server.json
+      - name: Publish to MCP registry
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish

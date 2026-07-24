@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.prometheus/prometheus-mcp",
+  "description": "An API-complete MCP server to manage Prometheus-compatible backends.",
+  "title": "Prometheus MCP Server",
+  "repository": {
+    "url": "https://github.com/prometheus/prometheus-mcp",
+    "source": "github"
+  },
+  "version": "${VERSION}",
+  "websiteUrl": "https://github.com/prometheus/prometheus-mcp",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "docker.io/prom/prometheus-mcp:v${VERSION}",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
