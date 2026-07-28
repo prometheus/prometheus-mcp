@@ -354,7 +354,7 @@ func initHTTPServer(logger *slog.Logger) *http.Server {
 		// application/json responses that complete in a single round
 		// trip, so standard timeouts apply.
 		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: *flagPrometheusTimeout,
 		IdleTimeout:  30 * time.Second,
 	}
 
