@@ -130,13 +130,6 @@ var (
 			" Docs: https://prometheus.io/docs/prometheus/latest/querying/api/#tsdb-admin-apis",
 	).Default("false").Bool()
 
-	flagMcpKeepaliveInterval = kingpin.Flag(
-		"mcp.keepalive-interval",
-		"Interval for sending keepalive pings to connected MCP sessions."+
-			" If the peer fails to respond, the session is closed."+
-			" Most useful for stdio transport to prevent idle connections from dropping.",
-	).Default("30s").Duration()
-
 	flagDocsAutoUpdate = kingpin.Flag(
 		"docs.auto-update",
 		"Enable automatic documentation updates from the official prometheus/docs repository."+
@@ -214,7 +207,6 @@ func main() {
 		DocsFS:                docsFs,
 		ToonOutputEnabled:     *flagMcpToonOutputEnabled,
 		ClientLoggingEnabled:  *flagMcpClientLogging,
-		KeepAlive:             *flagMcpKeepaliveInterval,
 	})
 	if err != nil {
 		logger.Error("Failed to create MCP server", "err", err)
