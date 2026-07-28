@@ -229,22 +229,20 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 	return server, container, nil
 }
 
-// NewStreamableHTTPHandler creates an HTTP handler for the MCP server.
+// NewStreamableHTTPHandler creates an HTTP handler for the MCP server using
+// stateless HTTP transport. In stateless mode, each request is handled
+// independently without session tracking, and responses are returned as
+// application/json rather than text/event-stream.
 // It wraps the handler with auth context middleware to forward Authorization headers.
-func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTimeout time.Duration) http.Handler {
-	if sessionTimeout == 0 {
-		// 0 value for session timeout means that sessions never close.
-		// Set a default if unset.
-		sessionTimeout = 1 * time.Hour
-	}
-
+func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger) http.Handler {
 	handler := mcp.NewStreamableHTTPHandler(
 		func(r *http.Request) *mcp.Server {
 			return server
 		},
 		&mcp.StreamableHTTPOptions{
-			SessionTimeout: sessionTimeout,
-			Logger:         logger,
+			Stateless:    true,
+			JSONResponse: true,
+			Logger:       logger,
 		},
 	)
 

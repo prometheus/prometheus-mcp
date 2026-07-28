@@ -134,13 +134,8 @@ var (
 		"mcp.keepalive-interval",
 		"Interval for sending keepalive pings to connected MCP sessions."+
 			" If the peer fails to respond, the session is closed."+
-			" Most useful for HTTP transports to prevent idle connections from dropping.",
+			" Most useful for stdio transport to prevent idle connections from dropping.",
 	).Default("30s").Duration()
-
-	flagMcpSessionTimeout = kingpin.Flag(
-		"mcp.session-timeout",
-		"Idle session timeout for HTTP transport MCP sessions.",
-	).Default("10m").Duration()
 
 	flagDocsAutoUpdate = kingpin.Flag(
 		"docs.auto-update",
@@ -296,7 +291,7 @@ func main() {
 				case "http":
 					logger.Debug("starting MCP server", "transport", "http")
 
-					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger, *flagMcpSessionTimeout)
+					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger)
 					http.Handle("/mcp", httpMcpHandler)
 					<-cancel
 				default:
@@ -355,15 +350,11 @@ func main() {
 func initHTTPServer(logger *slog.Logger) *http.Server {
 	server := &http.Server{
 		// These are TCP-level timeouts for individual HTTP
-		// request/response cycles, not MCP session timeouts.  MCP
-		// sessions are long lived, tracked by session ID, and managed
-		// through the go-sdk separately from these HTTP server values.
-		//
-		// Important: Because SSE/HTTP transports are streams, the
-		// WriteTimeout must be disabled because the response "never
-		// finishes".
+		// request/response cycles. Stateless HTTP transport uses
+		// application/json responses that complete in a single round
+		// trip, so standard timeouts apply.
 		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 0,
+		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  30 * time.Second,
 	}
 
