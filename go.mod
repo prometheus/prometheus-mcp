@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/alpkeskin/gotoon v0.1.1
 	github.com/blevesearch/bleve/v2 v2.6.0
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/oklog/run v1.2.0
 	github.com/prometheus/client_golang v1.24.1
