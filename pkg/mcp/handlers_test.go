@@ -692,14 +692,14 @@ func TestLabelNamesHandler(t *testing.T) {
 	testCases := []struct {
 		name               string
 		args               map[string]any
-		mockLabelNamesFunc func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error)
+		mockLabelNamesFunc func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error)
 		validateResult     func(t *testing.T, result string, isError bool, err error)
 	}{
 		{
 			name: "success",
 			args: map[string]any{},
-			mockLabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error) {
-				return []string{"__name__", "job", "instance"}, nil, nil
+			mockLabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
+				return model.LabelNames{"__name__", "job", "instance"}, nil, nil
 			},
 			validateResult: func(t *testing.T, result string, isError bool, err error) {
 				require.NoError(t, err)
@@ -711,7 +711,7 @@ func TestLabelNamesHandler(t *testing.T) {
 		{
 			name: "API error",
 			args: map[string]any{},
-			mockLabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error) {
+			mockLabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
 				return nil, nil, errors.New("api error")
 			},
 			validateResult: func(t *testing.T, result string, isError bool, err error) {
@@ -1140,13 +1140,13 @@ func TestListRulesHandler(t *testing.T) {
 	testCases := []struct {
 		name           string
 		args           map[string]any
-		mockRulesFunc  func(ctx context.Context) (promv1.RulesResult, error)
+		mockRulesFunc  func(ctx context.Context, matches []string) (promv1.RulesResult, error)
 		validateResult func(t *testing.T, result string, isError bool, err error)
 	}{
 		{
 			name: "success",
 			args: map[string]any{},
-			mockRulesFunc: func(ctx context.Context) (promv1.RulesResult, error) {
+			mockRulesFunc: func(ctx context.Context, matches []string) (promv1.RulesResult, error) {
 				return promv1.RulesResult{
 					Groups: []promv1.RuleGroup{
 						{
@@ -1172,7 +1172,7 @@ func TestListRulesHandler(t *testing.T) {
 		{
 			name: "API error",
 			args: map[string]any{},
-			mockRulesFunc: func(ctx context.Context) (promv1.RulesResult, error) {
+			mockRulesFunc: func(ctx context.Context, matches []string) (promv1.RulesResult, error) {
 				return promv1.RulesResult{}, errors.New("prometheus exploded")
 			},
 			validateResult: func(t *testing.T, result string, isError bool, err error) {
@@ -3500,12 +3500,12 @@ func TestConcurrentMultipleToolCalls(t *testing.T) {
 				Timestamp: model.TimeFromUnix(ts.Unix()),
 			}}, nil, nil
 		},
-		LabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error) {
+		LabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
 			mu.Lock()
 			callCounts["label_names"]++
 			mu.Unlock()
 			time.Sleep(1 * time.Millisecond)
-			return []string{"__name__", "job", "instance"}, nil, nil
+			return model.LabelNames{"__name__", "job", "instance"}, nil, nil
 		},
 		LabelValuesFunc: func(ctx context.Context, label string, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelValues, promv1.Warnings, error) {
 			mu.Lock()
