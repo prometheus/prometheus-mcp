@@ -188,6 +188,50 @@ func telemetryHandlePromptList(ctx context.Context, method string, req mcp.Reque
 	return result, err
 }
 
+// authHeaderKey is the context key for storing the Authorization header.
+type authHeaderKey struct{}
+
+// addAuthToContext adds an Authorization header value to the context.
+func addAuthToContext(ctx context.Context, auth string) context.Context {
+	return context.WithValue(ctx, authHeaderKey{}, auth)
+}
+
+// getAuthFromContext retrieves the Authorization header from the context.
+func getAuthFromContext(ctx context.Context) string {
+	if auth, ok := ctx.Value(authHeaderKey{}).(string); ok {
+		return auth
+	}
+	return ""
+}
+
+// authHeaderFromRequest returns the Authorization header of the HTTP request
+// that carried the given MCP request. Returns an empty string for transports
+// that do not attach HTTP headers (stdio, in-memory).
+func authHeaderFromRequest(req mcp.Request) string {
+	extra := req.GetExtra()
+	if extra == nil {
+		return ""
+	}
+	return extra.Header.Get("Authorization")
+}
+
+// authForwardingMiddleware creates an MCP middleware that extracts the
+// Authorization header from the HTTP request that carried each MCP call and
+// adds it to the handler context. The header is resolved on every request,
+// so clients that rotate credentials mid-session authenticate with their
+// current credentials. Requests that carry no Authorization header use the
+// default client built from flags.
+func authForwardingMiddleware() mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if auth := authHeaderFromRequest(req); auth != "" {
+				ctx = addAuthToContext(ctx, auth)
+			}
+			return next(ctx, method, req)
+		}
+	}
+}
+
 // telemetryHandleResourceRead instruments a resources/read request with metrics and logging.
 func telemetryHandleResourceRead(ctx context.Context, method string, req mcp.Request, next mcp.MethodHandler, logger *slog.Logger) (mcp.Result, error) {
 	params, ok := req.GetParams().(*mcp.ReadResourceParams)

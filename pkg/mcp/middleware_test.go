@@ -18,15 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -493,144 +493,10 @@ func TestTelemetryHandleResourceRead(t *testing.T) {
 	}
 }
 
-// TestAuthContextMiddleware tests the HTTP middleware that extracts
-// Authorization headers and adds them to the request context.
-func TestAuthContextMiddleware(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name          string
-		authHeader    string
-		expectedAuth  string
-		otherHeaders  map[string]string
-		verifyHeaders bool
-	}{
-		{
-			name:         "extracts Bearer token from Authorization header",
-			authHeader:   "Bearer my-secret-token",
-			expectedAuth: "Bearer my-secret-token",
-		},
-		{
-			name:         "extracts Basic auth from Authorization header",
-			authHeader:   "Basic dXNlcm5hbWU6cGFzc3dvcmQ=",
-			expectedAuth: "Basic dXNlcm5hbWU6cGFzc3dvcmQ=",
-		},
-		{
-			name:         "handles missing Authorization header gracefully",
-			authHeader:   "",
-			expectedAuth: "",
-		},
-		{
-			name:         "handles Authorization header with only whitespace",
-			authHeader:   "   ",
-			expectedAuth: "   ", // Note: middleware stores the raw value, does not trim
-		},
-		{
-			name:          "preserves other headers and request properties",
-			authHeader:    "Bearer test-token",
-			expectedAuth:  "Bearer test-token",
-			otherHeaders:  map[string]string{"X-Custom-Header": "custom-value", "Content-Type": "application/json"},
-			verifyHeaders: true,
-		},
-		{
-			name:         "handles token without type prefix",
-			authHeader:   "raw-token-value",
-			expectedAuth: "raw-token-value",
-		},
-		{
-			name:         "handles multi-word Bearer token",
-			authHeader:   "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ",
-			expectedAuth: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ",
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			var capturedAuth string
-			var capturedReq *http.Request
-
-			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				capturedAuth = getAuthFromContext(r.Context())
-				capturedReq = r
-				w.WriteHeader(http.StatusOK)
-			})
-
-			handler := authContextMiddleware(innerHandler)
-
-			req := httptest.NewRequest(http.MethodPost, "/mcp/v1", nil)
-			if tc.authHeader != "" {
-				req.Header.Set("Authorization", tc.authHeader)
-			}
-
-			// Add other headers if specified.
-			for key, value := range tc.otherHeaders {
-				req.Header.Set(key, value)
-			}
-
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
-
-			require.Equal(t, http.StatusOK, rr.Code)
-
-			// Verify auth context value.
-			// Empty auth headers are not added to context, but whitespace-only ones are.
-			if tc.authHeader == "" {
-				require.Empty(t, capturedAuth)
-			} else {
-				require.Equal(t, tc.expectedAuth, capturedAuth)
-			}
-
-			// Verify other headers were preserved.
-			if tc.verifyHeaders {
-				for key, value := range tc.otherHeaders {
-					require.Equal(t, value, capturedReq.Header.Get(key))
-				}
-			}
-		})
-	}
-}
-
-// TestAuthContextMiddleware_RequestMethod verifies that the middleware
-// correctly handles requests with different HTTP methods.
-func TestAuthContextMiddleware_RequestMethod(t *testing.T) {
-	t.Parallel()
-
-	methods := []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodOptions}
-
-	for _, method := range methods {
-		method := method
-		t.Run(method, func(t *testing.T) {
-			t.Parallel()
-
-			var capturedAuth string
-			var capturedMethod string
-
-			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				capturedAuth = getAuthFromContext(r.Context())
-				capturedMethod = r.Method
-				w.WriteHeader(http.StatusOK)
-			})
-
-			handler := authContextMiddleware(innerHandler)
-
-			req := httptest.NewRequest(method, "/mcp/v1", nil)
-			req.Header.Set("Authorization", "Bearer method-test-token")
-
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
-
-			require.Equal(t, http.StatusOK, rr.Code)
-			require.Equal(t, method, capturedMethod)
-			require.Equal(t, "Bearer method-test-token", capturedAuth)
-		})
-	}
-}
-
-// TestFullAuthFlow tests the complete auth flow from HTTP request through
-// tool execution to Prometheus API call.
+// TestFullAuthFlow tests the auth flow from a context-stored Authorization
+// value through GetAPIClient to the outgoing Prometheus request. The context
+// value is seeded directly; TestPerRequestAuthForwarding_StatefulHTTP covers
+// how it reaches the context from an HTTP request.
 func TestFullAuthFlow(t *testing.T) {
 	t.Parallel()
 
@@ -914,70 +780,166 @@ func TestGetAuthFromContext(t *testing.T) {
 	})
 }
 
-// TestAuthContextMiddleware_Integration tests the full HTTP request flow
-// through the middleware to verify context propagation.
-func TestAuthContextMiddleware_Integration(t *testing.T) {
+// TestAuthForwardingMiddleware verifies that the middleware adds the
+// Authorization header carried by the MCP request to the handler context.
+func TestAuthForwardingMiddleware(t *testing.T) {
 	t.Parallel()
 
-	t.Run("middleware propagates auth through handler chain", func(t *testing.T) {
-		t.Parallel()
-
-		var capturedAuths []string
-		var mu sync.Mutex
-
-		// Create a chain of handlers to verify context propagation.
-		innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			auth := getAuthFromContext(r.Context())
-			mu.Lock()
-			capturedAuths = append(capturedAuths, auth)
-			mu.Unlock()
-			w.WriteHeader(http.StatusOK)
-		})
-
-		handler := authContextMiddleware(innerHandler)
-
-		// Make multiple requests with different auth values.
-		tokens := []string{"Bearer token1", "Bearer token2", "Basic creds"}
-		for _, token := range tokens {
-			req := httptest.NewRequest(http.MethodPost, "/mcp/v1", nil)
-			req.Header.Set("Authorization", token)
-
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
-
-			require.Equal(t, http.StatusOK, rr.Code)
+	withExtra := func(header http.Header) mcp.Request {
+		return &mcp.ServerRequest[*mcp.CallToolParamsRaw]{
+			Params: &mcp.CallToolParamsRaw{Name: "query"},
+			Extra:  &mcp.RequestExtra{Header: header},
 		}
+	}
 
-		mu.Lock()
-		defer mu.Unlock()
-		require.Equal(t, tokens, capturedAuths)
-	})
+	testCases := []struct {
+		name         string
+		req          mcp.Request
+		expectedAuth string
+	}{
+		{
+			name:         "adds Authorization header to context",
+			req:          withExtra(http.Header{"Authorization": []string{"Bearer request-token"}}),
+			expectedAuth: "Bearer request-token",
+		},
+		{
+			name:         "handles request without Extra gracefully",
+			req:          mockRequest(&mcp.CallToolParamsRaw{Name: "query"}),
+			expectedAuth: "",
+		},
+		{
+			name:         "handles Extra with nil header gracefully",
+			req:          withExtra(nil),
+			expectedAuth: "",
+		},
+		{
+			name:         "handles missing Authorization header gracefully",
+			req:          withExtra(http.Header{"Content-Type": []string{"application/json"}}),
+			expectedAuth: "",
+		},
+	}
 
-	t.Run("middleware handles request body correctly", func(t *testing.T) {
-		t.Parallel()
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		var capturedBody string
-		var readErr error
+			nextCalled := false
+			var capturedAuth string
+			next := func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+				nextCalled = true
+				capturedAuth = getAuthFromContext(ctx)
+				return &mcp.CallToolResult{}, nil
+			}
 
-		innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			body, err := io.ReadAll(r.Body)
-			readErr = err
-			capturedBody = string(body)
-			w.WriteHeader(http.StatusOK)
+			_, err := authForwardingMiddleware()(next)(context.Background(), methodToolsCall, tc.req)
+			require.NoError(t, err)
+			require.True(t, nextCalled, "expected next handler to be called")
+			require.Equal(t, tc.expectedAuth, capturedAuth)
 		})
+	}
+}
 
-		handler := authContextMiddleware(innerHandler)
+// rotatingAuthRoundTripper sets a swappable Authorization header on every
+// outgoing request. This simulates a client that rotates credentials
+// mid-session. An empty value sends no header at all, like a client that
+// drops its credentials.
+type rotatingAuthRoundTripper struct {
+	mu   sync.Mutex
+	auth string
+	base http.RoundTripper
+}
 
-		requestBody := `{"jsonrpc":"2.0","method":"tools/call","params":{"name":"query"}}`
-		req := httptest.NewRequest(http.MethodPost, "/mcp/v1", strings.NewReader(requestBody))
-		req.Header.Set("Authorization", "Bearer test-token")
-		req.Header.Set("Content-Type", "application/json")
+func (rt *rotatingAuthRoundTripper) setAuth(auth string) {
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	rt.auth = auth
+}
 
-		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, req)
+func (rt *rotatingAuthRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	rt.mu.Lock()
+	auth := rt.auth
+	rt.mu.Unlock()
 
-		require.NoError(t, readErr)
-		require.Equal(t, http.StatusOK, rr.Code)
-		require.Equal(t, requestBody, capturedBody)
+	req = req.Clone(req.Context())
+	if auth == "" {
+		req.Header.Del("Authorization")
+	} else {
+		req.Header.Set("Authorization", auth)
+	}
+	return rt.base.RoundTrip(req)
+}
+
+// TestPerRequestAuthForwarding_StatefulHTTP tests the complete auth flow for
+// a client that rotates credentials mid-session. Handler contexts on the
+// streamable HTTP transport derive from the HTTP request that established
+// the MCP session, so without authForwardingMiddleware every tool call
+// authenticates with the Authorization header sent at initialize time. The
+// test drives a real client/server MCP session over HTTP and verifies that
+// the backend sees the header carried by each tools/call request. A final
+// header-less call verifies that requests without credentials use the
+// default client instead of the session's initialize-time token.
+func TestPerRequestAuthForwarding_StatefulHTTP(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var backendAuths []string
+
+	// Mock Prometheus backend recording the Authorization header per request.
+	promServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		backendAuths = append(backendAuths, r.Header.Get("Authorization"))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`))
+	}))
+	defer promServer.Close()
+
+	logger := promslog.NewNopLogger()
+	server, _, err := NewServer(context.Background(), ServerConfig{
+		Logger:            logger,
+		PrometheusURL:     promServer.URL,
+		PrometheusTimeout: 30 * time.Second,
+		RoundTripper:      http.DefaultTransport,
 	})
+	require.NoError(t, err)
+
+	httpServer := httptest.NewServer(NewStreamableHTTPHandler(server, logger, time.Minute))
+	defer httpServer.Close()
+
+	rt := &rotatingAuthRoundTripper{base: http.DefaultTransport}
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "0.0.0"}, nil)
+
+	ctx := context.Background()
+	rt.setAuth("Bearer initialize-token")
+	session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+		Endpoint:   httpServer.URL,
+		HTTPClient: &http.Client{Transport: rt},
+	}, nil)
+	require.NoError(t, err)
+	defer session.Close()
+
+	// Establishing the session must not touch the backend, so the recorded
+	// headers below map 1:1 to the tool calls.
+	mu.Lock()
+	require.Empty(t, backendAuths)
+	mu.Unlock()
+
+	// The final empty token drops the Authorization header entirely. The
+	// session was established with credentials, so the backend seeing no
+	// header proves the request used the default client rather than a
+	// session-scoped fallback to the initialize-time token.
+	for _, token := range []string{"Bearer rotated-token-1", "Bearer rotated-token-2", ""} {
+		rt.setAuth(token)
+		result, err := session.CallTool(ctx, &mcp.CallToolParams{
+			Name:      "query",
+			Arguments: map[string]any{"query": "up"},
+		})
+		require.NoError(t, err)
+		require.False(t, result.IsError, "tool call failed: %+v", result.Content)
+	}
+
+	mu.Lock()
+	require.Equal(t, []string{"Bearer rotated-token-1", "Bearer rotated-token-2", ""}, backendAuths)
+	mu.Unlock()
 }

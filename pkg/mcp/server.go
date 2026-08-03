@@ -218,8 +218,10 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 	// Register prompts.
 	registerPrompts(server)
 
-	// Add telemetry middleware for metrics and logging.
-	server.AddReceivingMiddleware(telemetryMiddleware(logger))
+	// Add MCP middlewares. Earlier arguments wrap later ones, so telemetry
+	// runs outermost and observes the full request, including auth
+	// resolution.
+	server.AddReceivingMiddleware(telemetryMiddleware(logger), authForwardingMiddleware())
 
 	logger.Info("MCP server created",
 		"prometheus_url", cfg.PrometheusURL,
@@ -230,7 +232,6 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 }
 
 // NewStreamableHTTPHandler creates an HTTP handler for the MCP server.
-// It wraps the handler with auth context middleware to forward Authorization headers.
 func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTimeout time.Duration) http.Handler {
 	if sessionTimeout == 0 {
 		// 0 value for session timeout means that sessions never close.
@@ -238,7 +239,7 @@ func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTi
 		sessionTimeout = 1 * time.Hour
 	}
 
-	handler := mcp.NewStreamableHTTPHandler(
+	return mcp.NewStreamableHTTPHandler(
 		func(r *http.Request) *mcp.Server {
 			return server
 		},
@@ -247,37 +248,6 @@ func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTi
 			Logger:         logger,
 		},
 	)
-
-	// Wrap with auth context middleware
-	return authContextMiddleware(handler)
-}
-
-// authHeaderKey is the context key for storing the Authorization header.
-type authHeaderKey struct{}
-
-// addAuthToContext adds an Authorization header value to the context.
-func addAuthToContext(ctx context.Context, auth string) context.Context {
-	return context.WithValue(ctx, authHeaderKey{}, auth)
-}
-
-// getAuthFromContext retrieves the Authorization header from the context.
-func getAuthFromContext(ctx context.Context) string {
-	if auth, ok := ctx.Value(authHeaderKey{}).(string); ok {
-		return auth
-	}
-	return ""
-}
-
-// authContextMiddleware creates an HTTP middleware that extracts the Authorization
-// header from requests and adds it to the request context.
-func authContextMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		if auth := r.Header.Get("Authorization"); auth != "" {
-			ctx = addAuthToContext(ctx, auth)
-		}
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 // docsState holds the documentation filesystem and search index.
@@ -346,7 +316,8 @@ func newServerContainer(cfg ServerConfig) (*ServerContainer, error) {
 
 // GetAPIClient returns a Prometheus API client, optionally with auth from context.
 // If an Authorization header is present in the context, a new client with those
-// credentials is created. Otherwise, the default client is returned.
+// credentials is created. Otherwise, the default client is returned. The
+// context value is populated per request by authForwardingMiddleware.
 func (s *ServerContainer) GetAPIClient(ctx context.Context) (promv1.API, http.RoundTripper) {
 	auth := getAuthFromContext(ctx)
 	if auth != "" {
