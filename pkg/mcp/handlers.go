@@ -767,7 +767,12 @@ func (s *ServerContainer) labelNamesAPICall(ctx context.Context, matches []strin
 		return "", fmt.Errorf("failed to get label names: %w", wrapErrorIfNotFound(err, path))
 	}
 
-	return s.formatTruncatedQueryAPIResponse(strings.Join(result, "\n"), warnings, truncationLimit)
+	names := make([]string, len(result))
+	for i, name := range result {
+		names[i] = string(name)
+	}
+
+	return s.formatTruncatedQueryAPIResponse(strings.Join(names, "\n"), warnings, truncationLimit)
 }
 
 func (s *ServerContainer) labelValuesAPICall(ctx context.Context, label string, matches []string, start, end time.Time, truncationLimit int) (string, error) {
@@ -967,7 +972,7 @@ func (s *ServerContainer) runtimeinfoAPICall(ctx context.Context) (string, error
 func (s *ServerContainer) rulesAPICall(ctx context.Context) (string, error) {
 	return s.doSimpleAPICall(ctx, "/api/v1/rules", "failed to get rules from Prometheus",
 		func(ctx context.Context, client promv1.API) (any, error) {
-			return client.Rules(ctx)
+			return client.Rules(ctx, nil)
 		})
 }
 

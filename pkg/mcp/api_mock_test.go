@@ -90,18 +90,20 @@ type MockPrometheusAPI struct {
 	CleanTombstonesFunc func(ctx context.Context) error
 	DeleteSeriesFunc    func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time) error
 	FlagsFunc           func(ctx context.Context) (promv1.FlagsResult, error)
-	LabelNamesFunc      func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error)
+	FormatQueryFunc     func(ctx context.Context, query string) (string, error)
+	LabelNamesFunc      func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error)
 	LabelValuesFunc     func(ctx context.Context, label string, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelValues, promv1.Warnings, error)
 	MetadataFunc        func(ctx context.Context, metric string, limit string) (map[string][]promv1.Metadata, error)
 	QueryFunc           func(ctx context.Context, query string, ts time.Time, opts ...promv1.Option) (model.Value, promv1.Warnings, error)
 	QueryExemplarsFunc  func(ctx context.Context, query string, startTime time.Time, endTime time.Time) ([]promv1.ExemplarQueryResult, error)
 	QueryRangeFunc      func(ctx context.Context, query string, r promv1.Range, opts ...promv1.Option) (model.Value, promv1.Warnings, error)
-	RulesFunc           func(ctx context.Context) (promv1.RulesResult, error)
+	RulesFunc           func(ctx context.Context, matches []string) (promv1.RulesResult, error)
 	RuntimeinfoFunc     func(ctx context.Context) (promv1.RuntimeinfoResult, error)
 	SeriesFunc          func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]model.LabelSet, promv1.Warnings, error)
 	SnapshotFunc        func(ctx context.Context, skipHead bool) (promv1.SnapshotResult, error)
 	TargetsFunc         func(ctx context.Context) (promv1.TargetsResult, error)
 	TargetsMetadataFunc func(ctx context.Context, matchTarget string, metric string, limit string) ([]promv1.MetricMetadata, error)
+	TSDBBlocksFunc      func(ctx context.Context) (promv1.TSDBBlocksResult, error)
 	TSDBFunc            func(ctx context.Context, opts ...promv1.Option) (promv1.TSDBResult, error)
 	WALReplayFunc       func(ctx context.Context) (promv1.WalReplayStatus, error)
 
@@ -231,7 +233,13 @@ func (m *MockPrometheusAPI) Flags(ctx context.Context) (promv1.FlagsResult, erro
 	}
 	return promv1.FlagsResult{}, nil
 }
-func (m *MockPrometheusAPI) LabelNames(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error) {
+func (m *MockPrometheusAPI) FormatQuery(ctx context.Context, query string) (string, error) {
+	if m.FormatQueryFunc != nil {
+		return m.FormatQueryFunc(ctx, query)
+	}
+	return "", nil
+}
+func (m *MockPrometheusAPI) LabelNames(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
 	// Record the call for verification.
 	m.mu.Lock()
 	m.LabelNamesCalls = append(m.LabelNamesCalls, LabelNamesCall{
@@ -310,9 +318,9 @@ func (m *MockPrometheusAPI) QueryRange(ctx context.Context, query string, r prom
 	}
 	return nil, nil, nil
 }
-func (m *MockPrometheusAPI) Rules(ctx context.Context) (promv1.RulesResult, error) {
+func (m *MockPrometheusAPI) Rules(ctx context.Context, matches []string) (promv1.RulesResult, error) {
 	if m.RulesFunc != nil {
-		return m.RulesFunc(ctx)
+		return m.RulesFunc(ctx, matches)
 	}
 	return promv1.RulesResult{}, nil
 }
@@ -354,6 +362,12 @@ func (m *MockPrometheusAPI) TargetsMetadata(ctx context.Context, matchTarget str
 		return m.TargetsMetadataFunc(ctx, matchTarget, metric, limit)
 	}
 	return nil, nil
+}
+func (m *MockPrometheusAPI) TSDBBlocks(ctx context.Context) (promv1.TSDBBlocksResult, error) {
+	if m.TSDBBlocksFunc != nil {
+		return m.TSDBBlocksFunc(ctx)
+	}
+	return promv1.TSDBBlocksResult{}, nil
 }
 func (m *MockPrometheusAPI) TSDB(ctx context.Context, opts ...promv1.Option) (promv1.TSDBResult, error) {
 	if m.TSDBFunc != nil {
@@ -450,8 +464,8 @@ func TestMockAPICallTracking(t *testing.T) {
 		t.Parallel()
 
 		mockAPI := &MockPrometheusAPI{
-			LabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error) {
-				return []string{"__name__", "job", "instance"}, nil, nil
+			LabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
+				return model.LabelNames{"__name__", "job", "instance"}, nil, nil
 			},
 		}
 		container := newTestContainer(mockAPI)
@@ -573,8 +587,8 @@ func TestMockAPICallTracking(t *testing.T) {
 			QueryFunc: func(ctx context.Context, query string, ts time.Time, opts ...promv1.Option) (model.Value, promv1.Warnings, error) {
 				return model.Vector{}, nil, nil
 			},
-			LabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]string, promv1.Warnings, error) {
-				return []string{}, nil, nil
+			LabelNamesFunc: func(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
+				return model.LabelNames{}, nil, nil
 			},
 		}
 		container := newTestContainer(mockAPI)
