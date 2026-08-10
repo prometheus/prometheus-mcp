@@ -234,7 +234,7 @@ docker run --rm -i -e PROMETHEUS_MCP_SERVER_PROMETHEUS_URL="https://$yourPrometh
 ```
 
 ```shell
-# Streamable HTTP transport (capable of SSE as well)
+# Stateless HTTP transport (application/json request/response)
 docker run --rm -p 8080:8080 ghcr.io/tjhop/prometheus-mcp-server:latest --prometheus.url "https://$yourPrometheus:9090" --mcp.transport "http" --web.listen-address ":8080"
 
 # or using env vars
