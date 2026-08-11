@@ -1,5 +1,7 @@
 # Prometheus MCP Server
 
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.tjhop%2Fprometheus-mcp-server.svg)](https://mcptoplist.com/server/io.github.tjhop%2Fprometheus-mcp-server)
+
 [![license](https://img.shields.io/github/license/tjhop/prometheus-mcp-server)](https://github.com/tjhop/prometheus-mcp-server/blob/master/LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/tjhop/prometheus-mcp-server)](https://goreportcard.com/report/github.com/tjhop/prometheus-mcp-server)
 [![golangci-lint](https://github.com/tjhop/prometheus-mcp-server/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/tjhop/prometheus-mcp-server/actions/workflows/golangci-lint.yml)
