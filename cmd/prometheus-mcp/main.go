@@ -121,6 +121,14 @@ var (
 		"Maximum number of parallel scrape requests. Use 0 to disable.",
 	).Default("40").Int()
 
+	flagWebForwardHeaders = kingpin.Flag(
+		"web.forward-headers",
+		"Name of an additional HTTP request header to forward from incoming MCP requests"+
+			" to the Prometheus API (HTTP transport only; repeat the flag for multiple headers)."+
+			" The Authorization header is always forwarded. Useful for multi-tenant"+
+			" Prometheus-compatible backends, e.g. `X-Scope-OrgID` for Cortex/Mimir/Thanos.",
+	).Strings()
+
 	flagEnableTsdbAdminTools = kingpin.Flag(
 		"dangerous.enable-tsdb-admin-tools",
 		"Enable and allow using tools that access Prometheus' TSDB Admin API endpoints"+
@@ -296,7 +304,7 @@ func main() {
 				case "http":
 					logger.Debug("starting MCP server", "transport", "http")
 
-					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger, *flagMcpSessionTimeout)
+					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger, *flagMcpSessionTimeout, *flagWebForwardHeaders...)
 					http.Handle("/mcp", httpMcpHandler)
 					<-cancel
 				default:

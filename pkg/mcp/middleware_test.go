@@ -981,3 +981,214 @@ func TestAuthContextMiddleware_Integration(t *testing.T) {
 		require.Equal(t, requestBody, capturedBody)
 	})
 }
+
+// TestForwardedHeadersContext tests storing and retrieving forwarded headers
+// from a context.
+func TestForwardedHeadersContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("stores and retrieves headers", func(t *testing.T) {
+		t.Parallel()
+
+		headers := http.Header{}
+		headers.Set("X-Scope-Orgid", "tenant-a")
+
+		ctx := addForwardedHeadersToContext(context.Background(), headers)
+		got := getForwardedHeadersFromContext(ctx)
+		require.Equal(t, "tenant-a", got.Get("X-Scope-OrgID"))
+	})
+
+	t.Run("returns nil for context without headers", func(t *testing.T) {
+		t.Parallel()
+
+		require.Nil(t, getForwardedHeadersFromContext(context.Background()))
+	})
+}
+
+// TestAuthContextMiddleware_ForwardHeaders tests that the middleware captures
+// additional configured headers into the request context.
+func TestAuthContextMiddleware_ForwardHeaders(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name            string
+		forwardHeaders  []string
+		requestHeaders  map[string][]string
+		expectedHeaders map[string][]string
+		expectNil       bool
+	}{
+		{
+			name:            "captures configured header",
+			forwardHeaders:  []string{"X-Scope-OrgID"},
+			requestHeaders:  map[string][]string{"X-Scope-OrgID": {"tenant-a"}},
+			expectedHeaders: map[string][]string{"X-Scope-OrgID": {"tenant-a"}},
+		},
+		{
+			name:            "preserves multiple values of a configured header",
+			forwardHeaders:  []string{"X-Scope-OrgID"},
+			requestHeaders:  map[string][]string{"X-Scope-OrgID": {"tenant-a", "tenant-b"}},
+			expectedHeaders: map[string][]string{"X-Scope-OrgID": {"tenant-a", "tenant-b"}},
+		},
+		{
+			name:           "ignores headers that are not configured",
+			forwardHeaders: []string{"X-Scope-OrgID"},
+			requestHeaders: map[string][]string{"X-Custom-Header": {"custom-value"}},
+			expectNil:      true,
+		},
+		{
+			name:           "captures nothing when no headers configured",
+			forwardHeaders: nil,
+			requestHeaders: map[string][]string{"X-Scope-OrgID": {"tenant-a"}},
+			expectNil:      true,
+		},
+		{
+			name:           "captures multiple configured headers",
+			forwardHeaders: []string{"X-Scope-OrgID", "X-Request-ID"},
+			requestHeaders: map[string][]string{
+				"X-Scope-OrgID": {"tenant-a"},
+				"X-Request-ID":  {"req-123"},
+			},
+			expectedHeaders: map[string][]string{
+				"X-Scope-OrgID": {"tenant-a"},
+				"X-Request-ID":  {"req-123"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var captured http.Header
+
+			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured = getForwardedHeadersFromContext(r.Context())
+				w.WriteHeader(http.StatusOK)
+			})
+
+			middleware := authContextMiddleware(innerHandler, tc.forwardHeaders...)
+
+			req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			for name, values := range tc.requestHeaders {
+				for _, v := range values {
+					req.Header.Add(name, v)
+				}
+			}
+
+			rr := httptest.NewRecorder()
+			middleware.ServeHTTP(rr, req)
+			require.Equal(t, http.StatusOK, rr.Code)
+
+			if tc.expectNil {
+				require.Nil(t, captured)
+				return
+			}
+			for name, values := range tc.expectedHeaders {
+				require.Equal(t, values, captured.Values(name))
+			}
+		})
+	}
+}
+
+// TestFullHeaderForwardingFlow tests that forwarded headers captured from an
+// incoming request reach the Prometheus backend, alongside Authorization.
+func TestFullHeaderForwardingFlow(t *testing.T) {
+	t.Parallel()
+
+	newCaptureServer := func(mu *sync.Mutex, auth, orgID *string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			*auth = r.Header.Get("Authorization")
+			*orgID = r.Header.Get("X-Scope-OrgID")
+			mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"status":"success","data":{"resultType":"vector","result":[]}}`))
+		}))
+	}
+
+	t.Run("forwarded header and auth both reach Prometheus", func(t *testing.T) {
+		t.Parallel()
+
+		var mu sync.Mutex
+		var receivedAuth, receivedOrgID string
+		promServer := newCaptureServer(&mu, &receivedAuth, &receivedOrgID)
+		defer promServer.Close()
+
+		container := newTestContainer(nil)
+		container.prometheusURL = promServer.URL
+		container.defaultRT = http.DefaultTransport
+
+		headers := http.Header{}
+		headers.Set("X-Scope-Orgid", "tenant-a")
+		ctx := addAuthToContext(context.Background(), "Bearer my-secret-api-token")
+		ctx = addForwardedHeadersToContext(ctx, headers)
+
+		_, rt := container.GetAPIClient(ctx)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, promServer.URL+"/api/v1/query", nil)
+		require.NoError(t, err)
+		_, err = rt.RoundTrip(req)
+		require.NoError(t, err)
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.Equal(t, "Bearer my-secret-api-token", receivedAuth)
+		require.Equal(t, "tenant-a", receivedOrgID)
+	})
+
+	t.Run("forwarded header reaches Prometheus without auth", func(t *testing.T) {
+		t.Parallel()
+
+		var mu sync.Mutex
+		var receivedAuth, receivedOrgID string
+		promServer := newCaptureServer(&mu, &receivedAuth, &receivedOrgID)
+		defer promServer.Close()
+
+		container := newTestContainer(nil)
+		container.prometheusURL = promServer.URL
+		container.defaultRT = http.DefaultTransport
+
+		headers := http.Header{}
+		headers.Set("X-Scope-Orgid", "tenant-b")
+		ctx := addForwardedHeadersToContext(context.Background(), headers)
+
+		_, rt := container.GetAPIClient(ctx)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, promServer.URL+"/api/v1/query", nil)
+		require.NoError(t, err)
+		_, err = rt.RoundTrip(req)
+		require.NoError(t, err)
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.Empty(t, receivedAuth)
+		require.Equal(t, "tenant-b", receivedOrgID)
+	})
+
+	t.Run("default client sends neither auth nor forwarded headers", func(t *testing.T) {
+		t.Parallel()
+
+		var mu sync.Mutex
+		var receivedAuth, receivedOrgID string
+		promServer := newCaptureServer(&mu, &receivedAuth, &receivedOrgID)
+		defer promServer.Close()
+
+		container := newTestContainer(nil)
+		container.prometheusURL = promServer.URL
+		container.defaultRT = http.DefaultTransport
+
+		ctx := context.Background()
+		_, rt := container.GetAPIClient(ctx)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, promServer.URL+"/api/v1/query", nil)
+		require.NoError(t, err)
+		_, err = rt.RoundTrip(req)
+		require.NoError(t, err)
+
+		mu.Lock()
+		defer mu.Unlock()
+		require.Empty(t, receivedAuth)
+		require.Empty(t, receivedOrgID)
+	})
+}

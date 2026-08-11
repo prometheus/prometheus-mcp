@@ -287,6 +287,12 @@ The MCP server supports [Prometheus Web Configuration files](https://github.com/
 Use the `--web.config.file` command-line flag to provide an HTTP configuration file.
 Please see [Flags](#command-line-flags) for more information.
 
+### Per-Request Header Forwarding (HTTP transport)
+
+When running with the HTTP transport, the `Authorization` header of each incoming MCP request is forwarded to the Prometheus API, so callers can bring their own credentials instead of (or in addition to) the server-level `--http.config` credentials.
+Additional request headers can be forwarded with the repeatable `--web.forward-headers` flag — for example `--web.forward-headers=X-Scope-OrgID` lets each caller select a tenant on multi-tenant Prometheus-compatible backends (Cortex, Mimir, Thanos).
+Requests that carry none of the forwarded headers fall back to the default client built from `--http.config`.
+
 ## Telemetry
 ### Metrics
 
@@ -478,6 +484,15 @@ Flags:
       --web.max-requests=40      Maximum number of parallel scrape
                                  requests. Use 0 to disable.
                                  ($PROMETHEUS_MCP_SERVER_WEB_MAX_REQUESTS)
+      --web.forward-headers=WEB.FORWARD-HEADERS ...  
+                                 Name of an additional HTTP request header
+                                 to forward from incoming MCP requests to the
+                                 Prometheus API (HTTP transport only; repeat the
+                                 flag for multiple headers). The Authorization
+                                 header is always forwarded. Useful for
+                                 multi-tenant Prometheus-compatible backends,
+                                 e.g. `X-Scope-OrgID` for Cortex/Mimir/Thanos.
+                                 ($PROMETHEUS_MCP_WEB_FORWARD_HEADERS)
       --[no-]dangerous.enable-tsdb-admin-tools  
                                  Enable and allow using tools that access
                                  Prometheus' TSDB Admin API endpoints
