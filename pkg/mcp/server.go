@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/alpkeskin/gotoon"
@@ -308,6 +309,10 @@ type ServerContainer struct {
 	// Docs state management.
 	docsMu sync.RWMutex
 	docs   *docsState
+
+	// Readiness state, flipped by SetReady once the MCP transport is able
+	// to accept client sessions.
+	ready atomic.Bool
 }
 
 // newServerContainer creates a new ServerContainer with the given configuration.
@@ -414,6 +419,47 @@ func (s *ServerContainer) GetEffectiveTruncationLimit(perCallLimit int) int {
 
 	// Otherwise, return global truncation limit.
 	return s.truncationLimit
+}
+
+// SetReady records whether the MCP server is ready to accept client sessions,
+// i.e. the configured transport is serving. It drives both the `/-/ready` web
+// endpoint and the server ready metric, keeping the two signals consistent.
+func (s *ServerContainer) SetReady(ready bool) {
+	s.ready.Store(ready)
+	if ready {
+		metricServerReady.Set(1)
+		return
+	}
+	metricServerReady.Set(0)
+}
+
+// Ready reports whether the MCP server is ready to accept client sessions.
+func (s *ServerContainer) Ready() bool {
+	return s.ready.Load()
+}
+
+// HandleHealthy serves liveness probes. It always succeeds: if the web server
+// can serve the request, the process is alive.
+func (s *ServerContainer) HandleHealthy() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Prometheus MCP Server is Healthy.")
+	})
+}
+
+// HandleReady serves readiness probes, failing with a 503 until the MCP
+// transport is able to accept client sessions.
+func (s *ServerContainer) HandleReady() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.Ready() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			fmt.Fprintln(w, "Prometheus MCP Server is Not Ready.")
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Prometheus MCP Server is Ready.")
+	})
 }
 
 // Docs search methods

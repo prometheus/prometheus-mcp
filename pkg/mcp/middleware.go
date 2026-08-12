@@ -58,7 +58,7 @@ func telemetryMiddleware(logger *slog.Logger) mcp.Middleware {
 }
 
 // telemetryHandleInitialize handles the MCP initialization, logging client
-// info and setting the server ready metric after successful initialization.
+// info after successful initialization.
 func telemetryHandleInitialize(ctx context.Context, method string, req mcp.Request, next mcp.MethodHandler, logger *slog.Logger) (mcp.Result, error) {
 	params, ok := req.GetParams().(*mcp.InitializeParams)
 	if !ok {
@@ -96,8 +96,6 @@ func telemetryHandleInitialize(ctx context.Context, method string, req mcp.Reque
 		"server_name", serverName,
 		"server_version", serverVersion,
 	)
-
-	metricServerReady.Set(1)
 
 	return result, nil
 }

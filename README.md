@@ -288,6 +288,17 @@ Use the `--web.config.file` command-line flag to provide an HTTP configuration f
 Please see [Flags](#command-line-flags) for more information.
 
 ## Telemetry
+### Health Endpoints
+
+The web server exposes health endpoints on the configured listen address, following the `/-/healthy` and `/-/ready` convention used across the Prometheus ecosystem:
+
+| Endpoint | Description |
+| --- | --- |
+| `/-/healthy` | Liveness: always returns `200 OK` while the process is up and serving HTTP. |
+| `/-/ready` | Readiness: returns `200 OK` once the MCP transport is mounted and able to accept client sessions, and `503 Service Unavailable` before that and during shutdown. |
+
+These map directly onto Kubernetes liveness/readiness probes. The `prom_mcp_server_ready` metric reports the same readiness state.
+
 ### Metrics
 
 Once running, the server exposes Prometheus metrics on the configured listen address and telemetry path (`:8080/metrics`, by default).

@@ -22,6 +22,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -30,6 +31,7 @@ import (
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/prometheus/common/model"
 	"github.com/stretchr/testify/require"
 
@@ -3776,4 +3778,50 @@ func TestSeriesHandlerSpecialCharactersInMatchers(t *testing.T) {
 			require.Equal(t, tc.matcher, capturedMatcher)
 		})
 	}
+}
+
+// Health endpoint tests. These intentionally do not run in parallel: SetReady
+// writes the shared package-level server ready gauge.
+
+func TestSetReady(t *testing.T) {
+	s := &ServerContainer{}
+
+	require.False(t, s.Ready())
+
+	s.SetReady(true)
+	require.True(t, s.Ready())
+	require.InDelta(t, 1, testutil.ToFloat64(metricServerReady), 0)
+
+	s.SetReady(false)
+	require.False(t, s.Ready())
+	require.InDelta(t, 0, testutil.ToFloat64(metricServerReady), 0)
+}
+
+func TestHandleHealthy(t *testing.T) {
+	s := &ServerContainer{}
+
+	rec := httptest.NewRecorder()
+	s.HandleHealthy().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/-/healthy", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "Healthy")
+}
+
+func TestHandleReady(t *testing.T) {
+	s := &ServerContainer{}
+
+	rec := httptest.NewRecorder()
+	s.HandleReady().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/-/ready", nil))
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	require.Contains(t, rec.Body.String(), "Not Ready")
+
+	s.SetReady(true)
+	rec = httptest.NewRecorder()
+	s.HandleReady().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/-/ready", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "Ready")
+
+	s.SetReady(false)
+	rec = httptest.NewRecorder()
+	s.HandleReady().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/-/ready", nil))
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
 }
