@@ -142,6 +142,15 @@ var (
 		"Idle session timeout for HTTP transport MCP sessions.",
 	).Default("10m").Duration()
 
+	flagMcpStateless = kingpin.Flag(
+		"mcp.stateless",
+		"Run the HTTP transport in stateless mode: the Mcp-Session-Id header is not"+
+			" validated and every request is served with a temporary session, so any"+
+			" replica behind a load balancer can serve any request without session"+
+			" affinity. Server-initiated requests to clients are unavailable in this"+
+			" mode; consider disabling --mcp.keepalive-interval alongside (set to 0).",
+	).Default("false").Bool()
+
 	flagDocsAutoUpdate = kingpin.Flag(
 		"docs.auto-update",
 		"Enable automatic documentation updates from the official prometheus/docs repository."+
@@ -296,7 +305,7 @@ func main() {
 				case "http":
 					logger.Debug("starting MCP server", "transport", "http")
 
-					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger, *flagMcpSessionTimeout)
+					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger, *flagMcpSessionTimeout, *flagMcpStateless)
 					http.Handle("/mcp", httpMcpHandler)
 					<-cancel
 				default:

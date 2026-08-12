@@ -450,6 +450,15 @@ Flags:
       --mcp.transport="stdio"    The type of transport to use for
                                  the MCP server [`stdio`, `http`].
                                  ($PROMETHEUS_MCP_SERVER_MCP_TRANSPORT)
+      --[no-]mcp.stateless       Run the HTTP transport in stateless mode:
+                                 the Mcp-Session-Id header is not validated
+                                 and every request is served with a temporary
+                                 session, so any replica behind a load balancer
+                                 can serve any request without session affinity.
+                                 Server-initiated requests to clients are
+                                 unavailable in this mode; consider disabling
+                                 --mcp.keepalive-interval alongside (set to 0).
+                                 ($PROMETHEUS_MCP_MCP_STATELESS)
       --prometheus.backend=PROMETHEUS.BACKEND  
                                  Customize the toolset for a specific
                                  Prometheus API compatible backend.
