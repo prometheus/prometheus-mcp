@@ -231,7 +231,12 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 
 // NewStreamableHTTPHandler creates an HTTP handler for the MCP server.
 // It wraps the handler with auth context middleware to forward Authorization headers.
-func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTimeout time.Duration) http.Handler {
+//
+// When stateless is true, the handler runs in the SDK's stateless mode: the
+// Mcp-Session-Id header is not validated and every request is served with a
+// temporary session, so any replica behind a load balancer can serve any
+// request — no session affinity required.
+func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTimeout time.Duration, stateless bool) http.Handler {
 	if sessionTimeout == 0 {
 		// 0 value for session timeout means that sessions never close.
 		// Set a default if unset.
@@ -244,6 +249,7 @@ func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTi
 		},
 		&mcp.StreamableHTTPOptions{
 			SessionTimeout: sessionTimeout,
+			Stateless:      stateless,
 			Logger:         logger,
 		},
 	)
