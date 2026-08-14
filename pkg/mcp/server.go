@@ -230,8 +230,10 @@ func NewServer(ctx context.Context, cfg ServerConfig) (*mcp.Server, *ServerConta
 }
 
 // NewStreamableHTTPHandler creates an HTTP handler for the MCP server.
-// It wraps the handler with auth context middleware to forward Authorization headers.
-func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTimeout time.Duration) http.Handler {
+// It wraps the handler with auth context middleware to forward Authorization
+// headers, plus any additional request headers named in forwardHeaders (e.g.
+// X-Scope-OrgID for multi-tenant Prometheus-compatible backends).
+func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTimeout time.Duration, forwardHeaders ...string) http.Handler {
 	if sessionTimeout == 0 {
 		// 0 value for session timeout means that sessions never close.
 		// Set a default if unset.
@@ -249,7 +251,7 @@ func NewStreamableHTTPHandler(server *mcp.Server, logger *slog.Logger, sessionTi
 	)
 
 	// Wrap with auth context middleware
-	return authContextMiddleware(handler)
+	return authContextMiddleware(handler, forwardHeaders...)
 }
 
 // authHeaderKey is the context key for storing the Authorization header.
@@ -268,13 +270,40 @@ func getAuthFromContext(ctx context.Context) string {
 	return ""
 }
 
+// forwardedHeadersKey is the context key for storing additional forwarded headers.
+type forwardedHeadersKey struct{}
+
+// addForwardedHeadersToContext adds forwarded header values to the context.
+func addForwardedHeadersToContext(ctx context.Context, headers http.Header) context.Context {
+	return context.WithValue(ctx, forwardedHeadersKey{}, headers)
+}
+
+// getForwardedHeadersFromContext retrieves forwarded headers from the context.
+func getForwardedHeadersFromContext(ctx context.Context) http.Header {
+	if headers, ok := ctx.Value(forwardedHeadersKey{}).(http.Header); ok {
+		return headers
+	}
+	return nil
+}
+
 // authContextMiddleware creates an HTTP middleware that extracts the Authorization
-// header from requests and adds it to the request context.
-func authContextMiddleware(next http.Handler) http.Handler {
+// header from requests and adds it to the request context. Additional request
+// headers named in forwardHeaders are captured into the context as well, so
+// per-request API clients can forward them to the backend.
+func authContextMiddleware(next http.Handler, forwardHeaders ...string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		if auth := r.Header.Get("Authorization"); auth != "" {
 			ctx = addAuthToContext(ctx, auth)
+		}
+		forwarded := make(http.Header)
+		for _, name := range forwardHeaders {
+			for _, value := range r.Header.Values(name) {
+				forwarded.Add(name, value)
+			}
+		}
+		if len(forwarded) > 0 {
+			ctx = addForwardedHeadersToContext(ctx, forwarded)
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -345,12 +374,13 @@ func newServerContainer(cfg ServerConfig) (*ServerContainer, error) {
 }
 
 // GetAPIClient returns a Prometheus API client, optionally with auth from context.
-// If an Authorization header is present in the context, a new client with those
-// credentials is created. Otherwise, the default client is returned.
+// If an Authorization header or forwarded headers are present in the context, a
+// new client carrying them is created. Otherwise, the default client is returned.
 func (s *ServerContainer) GetAPIClient(ctx context.Context) (promv1.API, http.RoundTripper) {
 	auth := getAuthFromContext(ctx)
-	if auth != "" {
-		client, rt := s.createClientWithAuth(auth)
+	forwarded := getForwardedHeadersFromContext(ctx)
+	if auth != "" || len(forwarded) > 0 {
+		client, rt := s.createClientWithAuth(auth, forwarded)
 		if client != nil {
 			return client, rt
 		}
@@ -360,20 +390,47 @@ func (s *ServerContainer) GetAPIClient(ctx context.Context) (promv1.API, http.Ro
 	return s.defaultAPIClient, s.defaultRT
 }
 
-// createClientWithAuth creates a new API client with the given Authorization header.
-func (s *ServerContainer) createClientWithAuth(authorization string) (promv1.API, http.RoundTripper) {
-	var authType, secret string
-	if strings.Contains(authorization, " ") {
-		parts := strings.SplitN(authorization, " ", 2)
-		authType = parts[0]
-		secret = parts[1]
-	} else {
-		s.logger.Debug("Assuming Bearer auth type for Authorization header with no type specified")
-		authType = "Bearer"
-		secret = authorization
+// headerForwardingRoundTripper sets the captured forwarded headers on every
+// outgoing request before delegating to the next RoundTripper.
+type headerForwardingRoundTripper struct {
+	headers http.Header
+	next    http.RoundTripper
+}
+
+func (h *headerForwardingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	for name, values := range h.headers {
+		req.Header.Del(name)
+		for _, value := range values {
+			req.Header.Add(name, value)
+		}
+	}
+	return h.next.RoundTrip(req)
+}
+
+// createClientWithAuth creates a new API client with the given Authorization
+// header and/or additional forwarded headers.
+func (s *ServerContainer) createClientWithAuth(authorization string, forwarded http.Header) (promv1.API, http.RoundTripper) {
+	rt := s.defaultRT
+	if len(forwarded) > 0 {
+		rt = &headerForwardingRoundTripper{headers: forwarded, next: rt}
 	}
 
-	rt := config.NewAuthorizationCredentialsRoundTripper(authType, config.NewInlineSecret(secret), s.defaultRT)
+	if authorization != "" {
+		var authType, secret string
+		if strings.Contains(authorization, " ") {
+			parts := strings.SplitN(authorization, " ", 2)
+			authType = parts[0]
+			secret = parts[1]
+		} else {
+			s.logger.Debug("Assuming Bearer auth type for Authorization header with no type specified")
+			authType = "Bearer"
+			secret = authorization
+		}
+
+		rt = config.NewAuthorizationCredentialsRoundTripper(authType, config.NewInlineSecret(secret), rt)
+	}
+
 	client, err := mcpProm.NewAPIClient(s.prometheusURL, rt)
 	if err != nil {
 		s.logger.Error("Failed to create API client with credentials", "err", err)
