@@ -228,7 +228,7 @@ func main() {
 		rootCtxCancel()
 		os.Exit(1) //nolint:gocritic
 	}
-	srv := initHTTPServer(logger)
+	srv := initHTTPServer(logger, mcpContainer)
 
 	var g run.Group
 	{
@@ -289,6 +289,7 @@ func main() {
 				case "stdio":
 					logger.Debug("starting MCP server", "transport", "stdio")
 
+					mcpContainer.SetReady(true)
 					if err := mcpServer.Run(ctx, &sdkmcp.StdioTransport{}); err != nil {
 						return fmt.Errorf("MCP server failed: %w", err)
 					}
@@ -298,6 +299,7 @@ func main() {
 
 					httpMcpHandler := mcp.NewStreamableHTTPHandler(mcpServer, logger, *flagMcpSessionTimeout)
 					http.Handle("/mcp", httpMcpHandler)
+					mcpContainer.SetReady(true)
 					<-cancel
 				default:
 					return fmt.Errorf("unsupported transport type: %s", *flagMcpTransport)
@@ -306,6 +308,7 @@ func main() {
 				return nil
 			},
 			func(err error) {
+				mcpContainer.SetReady(false)
 				close(cancel)
 				rootCtxCancel()
 			},
@@ -352,7 +355,7 @@ func main() {
 	logger.Info("See you next time!")
 }
 
-func initHTTPServer(logger *slog.Logger) *http.Server {
+func initHTTPServer(logger *slog.Logger, mcpContainer *mcp.ServerContainer) *http.Server {
 	server := &http.Server{
 		// These are TCP-level timeouts for individual HTTP
 		// request/response cycles, not MCP session timeouts.  MCP
@@ -380,6 +383,8 @@ func initHTTPServer(logger *slog.Logger) *http.Server {
 		metrics.Registry, metricsHandler,
 	)
 	http.Handle("/metrics", metricsHandler)
+	http.Handle("/-/healthy", mcpContainer.HandleHealthy())
+	http.Handle("/-/ready", mcpContainer.HandleReady())
 
 	landingPageLinks := []web.LandingLinks{
 		{
