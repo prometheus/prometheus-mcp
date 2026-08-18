@@ -4,7 +4,6 @@
     "uv@latest",
     "go@latest",
     "golangci-lint@latest",
-    "goreleaser@latest",
     "nodejs@22",
     "chart-testing@latest",
     "kubernetes-helm@latest"
