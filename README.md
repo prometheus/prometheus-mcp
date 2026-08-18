@@ -281,6 +281,17 @@ An example config can be found [in the examples folder here](./examples/http-con
 Use the `--http.config` command-line flag to provide an HTTP configuration file.
 Please see [Flags](#command-line-flags) for more information.
 
+### Forwarding Client Credentials
+
+When using the HTTP transport, the MCP server forwards the `Authorization` header on each MCP request to Prometheus for that request's API calls.
+Requests that carry no `Authorization` header, and all requests over the stdio transport, use the default client built from flags (see [Connecting to Secure Prometheus Instances](#connecting-to-secure-prometheus-instances)).
+
+The server forwards client credentials to Prometheus as-is and does not validate them.
+A credential that does not include an auth scheme is sent as a `Bearer` token.
+Anyone who can reach the MCP endpoint can query Prometheus with at least the default client's credentials, so restrict access to the endpoint with a [web configuration file](#securing-the-mcp-server-endpoints) or network-level controls.
+Note that basic authentication in the web configuration file (`basic_auth_users`) conflicts with credential forwarding: the same `Authorization` header a client uses to authenticate to the MCP server is then forwarded to Prometheus in place of the default client's credentials.
+TLS-only web configurations do not use the `Authorization` header and are unaffected.
+
 ### Securing the MCP Server Endpoints
 
 The MCP server supports [Prometheus Web Configuration files](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md) files to expose it's endpoints behind optional basic auth and custom TLS configs.
