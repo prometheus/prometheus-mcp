@@ -1,6 +1,6 @@
 # Full feature test values -- enables most optional template paths to validate
 # they render valid Kubernetes manifests. Covers: serviceMonitor (with
-# relabelings, metricRelabelings), ingress (with TLS), grafana dashboard
+# relabelings, metricRelabelings), ingress (with TLS), httpRoute, grafana dashboard
 # provisioning, httpConfig, mcp options, tsdbAdmin, extraArgs, extraEnv,
 # extraVolumes, extraVolumeMounts, resources, nodeSelector, tolerations,
 # affinity, fullnameOverride, containerPort, serviceAccount customizations,
@@ -90,6 +90,16 @@ ingress:
     - secretName: prometheus-mcp-server-tls
       hosts:
         - prometheus-mcp-server.test
+
+httpRoute:
+  enabled: true
+  annotations:
+    test-annotation: "true"
+  parentRefs:
+    - name: test-gateway
+      namespace: default
+  hostnames:
+    - prometheus-mcp-server.test
 
 serviceAccount:
   create: true

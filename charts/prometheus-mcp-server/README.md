@@ -78,6 +78,10 @@ helm uninstall prometheus-mcp-server
 | `ingress.annotations` | object | `{}` | Ingress annotations |
 | `ingress.hosts` | list | see values.yaml | Ingress hosts configuration |
 | `ingress.tls` | list | `[]` | Ingress TLS configuration |
+| `httpRoute.enabled` | bool | `false` | Enable Gateway API HTTPRoute resource |
+| `httpRoute.annotations` | object | `{}` | HTTPRoute annotations |
+| `httpRoute.parentRefs` | list | `[]` | Parent gateway references (required when enabled) |
+| `httpRoute.hostnames` | list | `[]` | Hostnames to match (matches all if empty) |
 | `serviceMonitor.enabled` | bool | `false` | Enable ServiceMonitor for Prometheus Operator |
 | `serviceMonitor.labels` | object | `{}` | Extra labels for serviceMonitorSelector matching |
 | `serviceMonitor.namespace` | string | `""` | Namespace to deploy the ServiceMonitor into |
@@ -201,6 +205,24 @@ ingress:
 ```bash
 helm install prometheus-mcp-server oci://ghcr.io/tjhop/charts/prometheus-mcp-server \
   -f ingress-values.yaml
+```
+
+#### HTTPRoute (Gateway API)
+
+```yaml
+# httproute-values.yaml
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: default
+  hostnames:
+    - prometheus-mcp.example.com
+```
+
+```bash
+helm install prometheus-mcp-server oci://ghcr.io/tjhop/charts/prometheus-mcp-server \
+  -f httproute-values.yaml
 ```
 
 #### Extra arguments

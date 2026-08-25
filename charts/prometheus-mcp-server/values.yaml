@@ -104,6 +104,21 @@ ingress:
   #    hosts:
   #      - prometheus-mcp-server.local
 
+httpRoute:
+  # Enable Gateway API HTTPRoute resource
+  enabled: false
+  # Annotations to add to the HTTPRoute
+  annotations: {}
+  # Parent references (required when enabled). Each entry must specify at least a
+  # gateway name; namespace and sectionName are optional.
+  parentRefs: []
+  #  - name: my-gateway
+  #    namespace: default
+  #    sectionName: https
+  # Hostnames to match (optional, matches all hostnames if empty)
+  hostnames: []
+  #  - prometheus-mcp-server.local
+
 grafana:
   dashboards:
     # Enable Grafana dashboard provisioning via sidecar ConfigMap discovery.
