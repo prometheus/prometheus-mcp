@@ -327,9 +327,10 @@ func TestTelemetryHandleToolCall(t *testing.T) {
 			nextResult: &mcp.CallToolResult{
 				Content: []mcp.Content{&mcp.TextContent{Text: "error"}},
 			},
-			nextErr:    errors.New("tool boom"),
-			wantLogged: "Failed calling tool",
-			wantErr:    true,
+			nextErr:       errors.New("tool boom"),
+			wantLogged:    "Failed calling tool",
+			wantLogFields: []string{`"error_kind":"protocol"`},
+			wantErr:       true,
 		},
 		{
 			name: "failed type assertion on result returns early without panic",
@@ -338,10 +339,11 @@ func TestTelemetryHandleToolCall(t *testing.T) {
 				Arguments: json.RawMessage(`{}`),
 			}),
 			// Return a non-CallToolResult to trigger failed type assertion.
-			nextResult: &mcp.InitializeResult{ProtocolVersion: "2025-03-26"},
-			nextErr:    nil,
-			wantLogged: "Failed to convert result to call tool result",
-			wantErr:    false,
+			nextResult:    &mcp.InitializeResult{ProtocolVersion: "2025-03-26"},
+			nextErr:       nil,
+			wantLogged:    "Unusable tool call result",
+			wantLogFields: []string{`"error_kind":"unusable_result"`},
+			wantErr:       false,
 		},
 		{
 			name: "nil result from next returns early without panic",
@@ -349,12 +351,13 @@ func TestTelemetryHandleToolCall(t *testing.T) {
 				Name:      "query",
 				Arguments: json.RawMessage(`{}`),
 			}),
-			// Return nil result with an error to trigger failed type
-			// assertion on nil interface value.
-			nextResult: nil,
-			nextErr:    errors.New("nil result boom"),
-			wantLogged: "Failed to convert result to call tool result",
-			wantErr:    true,
+			// Return nil result with an error; the error must be handled
+			// before the result is ever type asserted.
+			nextResult:    nil,
+			nextErr:       errors.New("nil result boom"),
+			wantLogged:    "Failed calling tool",
+			wantLogFields: []string{`"error_kind":"protocol"`},
+			wantErr:       true,
 		},
 		{
 			name: "tool result with IsError true logs failure",
@@ -366,9 +369,10 @@ func TestTelemetryHandleToolCall(t *testing.T) {
 				Content: []mcp.Content{&mcp.TextContent{Text: "something went wrong"}},
 				IsError: true,
 			},
-			nextErr:    nil,
-			wantLogged: "Failed calling tool",
-			wantErr:    false,
+			nextErr:       nil,
+			wantLogged:    "Failed calling tool",
+			wantLogFields: []string{`"error_kind":"tool_result"`, "something went wrong"},
+			wantErr:       false,
 		},
 		{
 			name:       "invalid params type falls through gracefully",

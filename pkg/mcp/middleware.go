@@ -15,6 +15,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -84,7 +85,7 @@ func telemetryHandleInitialize(ctx context.Context, method string, req mcp.Reque
 	// Extract server info from result for logging.
 	serverName := ""
 	serverVersion := ""
-	if initResult, ok := result.(*mcp.InitializeResult); ok && initResult.ServerInfo != nil {
+	if initResult, ok := result.(*mcp.InitializeResult); ok && initResult != nil && initResult.ServerInfo != nil {
 		serverName = initResult.ServerInfo.Name
 		serverVersion = initResult.ServerInfo.Version
 	}
@@ -111,6 +112,7 @@ func telemetryHandleToolCall(ctx context.Context, method string, req mcp.Request
 
 	toolName := params.Name
 	args := params.Arguments
+	labels := prometheus.Labels{"tool_name": toolName}
 	logger = logger.With("tool_name", toolName, "request_arguments", args)
 
 	logger.Debug("Calling tool")
@@ -118,20 +120,50 @@ func telemetryHandleToolCall(ctx context.Context, method string, req mcp.Request
 	result, err := next(ctx, method, req)
 	duration := time.Since(startTime)
 
-	metricToolCallDuration.With(prometheus.Labels{"tool_name": toolName}).Observe(duration.Seconds())
+	metricToolCallDuration.With(labels).Observe(duration.Seconds())
 	logger.Debug("Finished calling tool", "duration", duration)
-	toolResult, ok := result.(*mcp.CallToolResult)
-	if !ok {
-		metricToolCallsFailed.With(prometheus.Labels{"tool_name": toolName}).Inc()
-		logger.Error("Failed to convert result to call tool result")
+
+	// Protocol level failure; this is an unknown tool, a handler returning
+	// *jsonrpc.Error, or an output marshalling failure. This results in a
+	// typed nil, which passes the type assertion below, so need to check
+	// the error first.
+	if err != nil {
+		metricToolCallsFailed.With(labels).Inc()
+		logger.Error("Failed calling tool", "error_kind", "protocol", "error", err)
 		return result, err
 	}
-	if err != nil || toolResult.IsError {
-		metricToolCallsFailed.With(prometheus.Labels{"tool_name": toolName}).Inc()
-		logger.Error("Failed calling tool", "result", result, "error", err)
+
+	toolResult, ok := result.(*mcp.CallToolResult)
+	if !ok || toolResult == nil {
+		metricToolCallsFailed.With(labels).Inc()
+		logger.Error("Unusable tool call result", "error_kind", "unusable_result", "result_type", fmt.Sprintf("%T", result))
+		return result, nil
 	}
 
-	return result, err
+	// Tool level failures.
+	if toolResult.IsError {
+		metricToolCallsFailed.With(labels).Inc()
+		logger.Error("Failed calling tool", "error_kind", "tool_result", "error", toolResultErrorText(toolResult))
+	}
+
+	return result, nil
+}
+
+// toolResultErrorText returns the error message from a failed tool call
+// result. Spec says it should be put in first non-empty text content entry.
+func toolResultErrorText(res *mcp.CallToolResult) string {
+	// Check if error was recorded via SetError
+	if err := res.GetError(); err != nil {
+		return err.Error()
+	}
+
+	for _, content := range res.Content {
+		if tc, ok := content.(*mcp.TextContent); ok && tc != nil && tc.Text != "" {
+			return tc.Text
+		}
+	}
+
+	return "tool reported an error with no message"
 }
 
 // telemetryHandlePromptGet instruments a prompts/get request with metrics and logging.
@@ -157,7 +189,7 @@ func telemetryHandlePromptGet(ctx context.Context, method string, req mcp.Reques
 
 	if err != nil {
 		metricPromptGetsFailed.With(prometheus.Labels{"prompt_name": promptName}).Inc()
-		logger.Error("Failed calling prompt", "result", result, "error", err)
+		logger.Error("Failed calling prompt", "error", err)
 	}
 
 	return result, err
@@ -173,14 +205,14 @@ func telemetryHandlePromptList(ctx context.Context, method string, req mcp.Reque
 	duration := time.Since(startTime)
 
 	metricPromptListDuration.Observe(duration.Seconds())
-	if listResult, ok := result.(*mcp.ListPromptsResult); ok {
+	if listResult, ok := result.(*mcp.ListPromptsResult); ok && listResult != nil {
 		logger = logger.With("prompt_count", len(listResult.Prompts))
 	}
 	logger.Debug("Finished listing prompts", "duration", duration)
 
 	if err != nil {
 		metricPromptListsFailed.Inc()
-		logger.Error("Failed listing prompts", "result", result, "error", err)
+		logger.Error("Failed listing prompts", "error", err)
 	}
 
 	return result, err
@@ -253,7 +285,7 @@ func telemetryHandleResourceRead(ctx context.Context, method string, req mcp.Req
 
 	if err != nil {
 		metricResourceCallsFailed.With(prometheus.Labels{"resource_uri": uri}).Inc()
-		logger.Error("Failed calling resource", "result", result, "error", err)
+		logger.Error("Failed calling resource", "error", err)
 	}
 
 	return result, err
