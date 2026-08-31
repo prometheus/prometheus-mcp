@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // MCP method names. Needed because the go-sdk does not export them.
@@ -112,7 +111,6 @@ func telemetryHandleToolCall(ctx context.Context, method string, req mcp.Request
 
 	toolName := params.Name
 	args := params.Arguments
-	labels := prometheus.Labels{"tool_name": toolName}
 	logger = logger.With("tool_name", toolName, "request_arguments", args)
 
 	logger.Debug("Calling tool")
@@ -120,7 +118,7 @@ func telemetryHandleToolCall(ctx context.Context, method string, req mcp.Request
 	result, err := next(ctx, method, req)
 	duration := time.Since(startTime)
 
-	metricToolCallDuration.With(labels).Observe(duration.Seconds())
+	metricToolCallDuration.WithLabelValues(toolName).Observe(duration.Seconds())
 	logger.Debug("Finished calling tool", "duration", duration)
 
 	// Protocol level failure; this is an unknown tool, a handler returning
@@ -128,21 +126,21 @@ func telemetryHandleToolCall(ctx context.Context, method string, req mcp.Request
 	// typed nil, which passes the type assertion below, so need to check
 	// the error first.
 	if err != nil {
-		metricToolCallsFailed.With(labels).Inc()
+		metricToolCallsFailed.WithLabelValues(toolName).Inc()
 		logger.Error("Failed calling tool", "error_kind", "protocol", "error", err)
 		return result, err
 	}
 
 	toolResult, ok := result.(*mcp.CallToolResult)
 	if !ok || toolResult == nil {
-		metricToolCallsFailed.With(labels).Inc()
+		metricToolCallsFailed.WithLabelValues(toolName).Inc()
 		logger.Error("Unusable tool call result", "error_kind", "unusable_result", "result_type", fmt.Sprintf("%T", result))
 		return result, nil
 	}
 
 	// Tool level failures.
 	if toolResult.IsError {
-		metricToolCallsFailed.With(labels).Inc()
+		metricToolCallsFailed.WithLabelValues(toolName).Inc()
 		logger.Error("Failed calling tool", "error_kind", "tool_result", "error", toolResultErrorText(toolResult))
 	}
 
@@ -184,11 +182,11 @@ func telemetryHandlePromptGet(ctx context.Context, method string, req mcp.Reques
 	result, err := next(ctx, method, req)
 	duration := time.Since(startTime)
 
-	metricPromptGetDuration.With(prometheus.Labels{"prompt_name": promptName}).Observe(duration.Seconds())
+	metricPromptGetDuration.WithLabelValues(promptName).Observe(duration.Seconds())
 	logger.Debug("Finished calling prompt", "duration", duration)
 
 	if err != nil {
-		metricPromptGetsFailed.With(prometheus.Labels{"prompt_name": promptName}).Inc()
+		metricPromptGetsFailed.WithLabelValues(promptName).Inc()
 		logger.Error("Failed calling prompt", "error", err)
 	}
 
@@ -280,11 +278,11 @@ func telemetryHandleResourceRead(ctx context.Context, method string, req mcp.Req
 	result, err := next(ctx, method, req)
 	duration := time.Since(startTime)
 
-	metricResourceCallDuration.With(prometheus.Labels{"resource_uri": uri}).Observe(duration.Seconds())
+	metricResourceCallDuration.WithLabelValues(uri).Observe(duration.Seconds())
 	logger.Debug("Finished calling resource", "duration", duration)
 
 	if err != nil {
-		metricResourceCallsFailed.With(prometheus.Labels{"resource_uri": uri}).Inc()
+		metricResourceCallsFailed.WithLabelValues(uri).Inc()
 		logger.Error("Failed calling resource", "error", err)
 	}
 
