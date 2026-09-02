@@ -382,7 +382,7 @@ func initHTTPServer(logger *slog.Logger, mcpContainer *mcp.ServerContainer) *htt
 	metricsHandler = promhttp.InstrumentMetricHandler(
 		metrics.Registry, metricsHandler,
 	)
-	http.Handle("/metrics", metricsHandler)
+	http.Handle(*flagWebTelemetryPath, metricsHandler)
 	http.Handle("/-/healthy", mcpContainer.HandleHealthy())
 	http.Handle("/-/ready", mcpContainer.HandleReady())
 
