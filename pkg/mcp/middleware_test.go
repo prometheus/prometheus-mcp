@@ -904,7 +904,7 @@ func TestPerRequestAuthForwarding_StatefulHTTP(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	httpServer := httptest.NewServer(NewStreamableHTTPHandler(server, logger, time.Minute))
+	httpServer := httptest.NewServer(NewStreamableHTTPHandler(server, logger, time.Minute, false))
 	defer httpServer.Close()
 
 	rt := &rotatingAuthRoundTripper{base: http.DefaultTransport}

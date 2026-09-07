@@ -1,0 +1,10 @@
+pipelines:
+  # ponytail: no Go pipeline type exists in jenkins-commons (only Java/JavaScript/React/Python
+  # have a <Name>.Jenkinsfile there — see shared.groovy's `pipeline.jenkinsfile = "${name}.Jenkinsfile"`
+  # dispatch). Build/test/release for this repo is already fully handled by
+  # .github/workflows/ci.yml (promci), and deployment goes through the existing Helm chart
+  # (microservices-configuration/charts/prometheus-mcp-server) + ArgoCD, not a Jenkins-built
+  # image. Add a Go.Jenkinsfile to jenkins-commons first if a Java/JS/React-style build+deploy
+  # stage is actually wanted here.
+  CheckPullRequest:
+    enabled: false
