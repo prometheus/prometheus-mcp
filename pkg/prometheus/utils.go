@@ -17,9 +17,19 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/common/model"
+)
+
+const (
+	// nowPrefix is the leading token of Grafana style relative time
+	// expressions ("now", "now-1h").
+	nowPrefix = "now"
+
+	// nowExpressionErrorHelp names the accepted forms for error messages.
+	nowExpressionErrorHelp = "expected now, now-<duration>, or now+<duration>"
 )
 
 var (
@@ -84,22 +94,60 @@ func ParseTimestamp(s string) (time.Time, error) {
 // formats and possibly make shell calls to `date`/`python` for time handling,
 // etc. Accepting duration strings from the get go avoids a lot of LLM
 // confusion and failed/extra tool calls.
+//
+// The same reasoning applies to Grafana's relative time idiom: clients
+// regularly send "now" or "now-1h" because that is what they type into
+// Grafana, so those forms are accepted too.
 func ParseTimestampOrDuration(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+
+	// "now" expressions are handled first; nothing else this parser
+	// accepts starts with "now".
+	if strings.HasPrefix(strings.ToLower(s), nowPrefix) {
+		return parseNowExpression(s)
+	}
+
 	if t, err := ParseTimestamp(s); err == nil {
 		return t, nil
 	}
 
-	if dur, err := model.ParseDuration(s); err == nil {
+	if dur, err := model.ParseDurationAllowNegative(s); err == nil {
 		// Durations always represent a time in the past relative to now.
 		// Both "5m" and "-5m" mean "5 minutes ago" -- we normalize
 		// negative durations so that callers (typically LLMs) get
 		// consistent behavior regardless of sign convention.
-		timeDur := time.Duration(dur)
-		if timeDur < 0 {
-			timeDur = -timeDur
-		}
-		return time.Now().Add(-timeDur), nil
+		return time.Now().Add(-time.Duration(dur).Abs()), nil
 	}
 
 	return time.Time{}, fmt.Errorf("cannot parse %q to a valid timestamp or duration", s)
+}
+
+// parseNowExpression resolves "now", "now-<duration>" and "now+<duration>"
+// against the current time. Durations use Prometheus duration syntax, so their
+// unit suffixes stay case sensitive even though the "now" token is not.
+func parseNowExpression(s string) (time.Time, error) {
+	now := time.Now()
+
+	if strings.ToLower(s) == nowPrefix {
+		return now, nil
+	}
+
+	rest := strings.TrimSpace(s[len(nowPrefix):])
+	sign := rest[0]
+	if sign != '-' && sign != '+' {
+		return time.Time{}, fmt.Errorf("cannot parse %q: %s", s, nowExpressionErrorHelp)
+	}
+
+	// A sign on the duration itself (eg, "now--5m") is rejected by
+	// model.ParseDuration, which only accepts unsigned durations.
+	dur, err := model.ParseDuration(strings.TrimSpace(rest[1:]))
+	if err != nil {
+		return time.Time{}, fmt.Errorf("cannot parse %q: %s: %w", s, nowExpressionErrorHelp, err)
+	}
+
+	if sign == '-' {
+		return now.Add(-time.Duration(dur)), nil
+	}
+
+	return now.Add(time.Duration(dur)), nil
 }
