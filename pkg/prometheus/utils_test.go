@@ -82,62 +82,57 @@ func TestParseTimestampOrDuration(t *testing.T) {
 		require.True(t, expected.Equal(got), "expected times to be equal", "expected", expected, "got", got)
 	})
 
-	// Test cases for duration parsing (relative to now).
-	durationCases := []struct {
-		name     string
-		input    string
-		duration time.Duration
+	// Relative inputs resolve against the current time. Offsets are signed:
+	// negative is in the past, positive in the future, zero is "now" itself.
+	relativeCases := []struct {
+		name   string
+		input  string
+		offset time.Duration
 	}{
-		{
-			name:     "5 minutes",
-			input:    "5m",
-			duration: 5 * time.Minute,
-		},
-		{
-			name:     "1 hour",
-			input:    "1h",
-			duration: 1 * time.Hour,
-		},
-		{
-			name:     "1 hour 30 minutes",
-			input:    "1h30m",
-			duration: 1*time.Hour + 30*time.Minute,
-		},
-		{
-			name:     "30 seconds",
-			input:    "30s",
-			duration: 30 * time.Second,
-		},
-		{
-			name:     "1 day",
-			input:    "1d",
-			duration: 24 * time.Hour,
-		},
-		{
-			name:     "1 year",
-			input:    "1y",
-			duration: 365 * 24 * time.Hour,
-		},
+		{name: "5 minutes", input: "5m", offset: -5 * time.Minute},
+		{name: "1 hour", input: "1h", offset: -1 * time.Hour},
+		{name: "1 hour 30 minutes", input: "1h30m", offset: -(1*time.Hour + 30*time.Minute)},
+		{name: "30 seconds", input: "30s", offset: -30 * time.Second},
+		{name: "1 day", input: "1d", offset: -24 * time.Hour},
+		{name: "1 year", input: "1y", offset: -365 * 24 * time.Hour},
+		// A leading sign is tolerated and ignored: "-5m" is still 5 minutes ago.
+		{name: "Negative 5 minutes", input: "-5m", offset: -5 * time.Minute},
+		{name: "Bare now", input: "now", offset: 0},
+		{name: "Uppercase now", input: "NOW", offset: 0},
+		{name: "Now minus 5 minutes", input: "now-5m", offset: -5 * time.Minute},
+		{name: "Now plus 5 minutes", input: "now+5m", offset: 5 * time.Minute},
+		{name: "Now minus 5 minutes with spaces", input: " now - 5m ", offset: -5 * time.Minute},
 	}
 
-	for _, tc := range durationCases {
+	for _, tc := range relativeCases {
 		t.Run(tc.name, func(t *testing.T) {
 			before := time.Now()
 			got, err := ParseTimestampOrDuration(tc.input)
 			after := time.Now()
 
 			require.NoError(t, err)
+			// Bound the result by the clock readings around the call so
+			// time elapsed during the test cannot fail it.
+			require.WithinRange(t, got, before.Add(tc.offset), after.Add(tc.offset))
+		})
+	}
 
-			// The result should be approximately (now - duration).
-			// Account for time elapsed during the test by checking
-			// the result is within the valid window.
-			expectedEarliest := before.Add(-tc.duration)
-			expectedLatest := after.Add(-tc.duration)
+	// Malformed "now" expressions report the accepted forms rather than
+	// falling through to the generic timestamp/duration error.
+	nowErrorCases := []struct {
+		name  string
+		input string
+	}{
+		{name: "Now with trailing sign only", input: "now-"},
+		{name: "Now with trailing garbage", input: "nowish"},
+		{name: "Now with invalid duration", input: "now-1x"},
+		{name: "Now with signed duration", input: "now--5m"},
+	}
 
-			require.False(t, got.Before(expectedEarliest),
-				"result %v should not be before %v (expected earliest)", got, expectedEarliest)
-			require.False(t, got.After(expectedLatest),
-				"result %v should not be after %v (expected latest)", got, expectedLatest)
+	for _, tc := range nowErrorCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseTimestampOrDuration(tc.input)
+			require.ErrorContains(t, err, nowExpressionErrorHelp)
 		})
 	}
 

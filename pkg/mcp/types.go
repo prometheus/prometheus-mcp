@@ -26,8 +26,8 @@ type EmptyInput struct{}
 
 // TimeRangeInput provides optional start/end time parameters for time-bounded queries.
 type TimeRangeInput struct {
-	StartTime string `json:"start_time,omitempty" jsonschema:"start timestamp for the query. Accepts: Unix epoch seconds, RFC3339, or a duration string relative to now (e.g. 5m, 1h30m, etc). Defaults to 5m ago."`
-	EndTime   string `json:"end_time,omitempty" jsonschema:"end timestamp for the query. Accepts: Unix epoch seconds, RFC3339, or a duration string relative to now (e.g. 5m, 1h30m, etc). Defaults to current time."`
+	StartTime string `json:"start_time,omitempty" jsonschema:"start timestamp for the query. Accepts: Unix epoch seconds, RFC3339, now, now-<duration>, now+<duration> (e.g. now-1h), or a duration string relative to now (e.g. 5m, 1h30m, etc). Defaults to 5m ago."`
+	EndTime   string `json:"end_time,omitempty" jsonschema:"end timestamp for the query. Accepts: Unix epoch seconds, RFC3339, now, now-<duration>, now+<duration> (e.g. now-1h), or a duration string relative to now (e.g. 5m, 1h30m, etc). Defaults to current time."`
 }
 
 // TruncatableInput provides optional truncation limit for query responses.
@@ -40,7 +40,7 @@ type TruncatableInput struct {
 // QueryInput is the input for the instant query tool.
 type QueryInput struct {
 	Query     string `json:"query" jsonschema:"the PromQL query to execute"`
-	Timestamp string `json:"timestamp,omitempty" jsonschema:"evaluation timestamp for the instant query. Accepts: Unix epoch seconds, RFC3339, or a duration string relative to now e.g. 5m, 1h30m, etc. Defaults to current time."`
+	Timestamp string `json:"timestamp,omitempty" jsonschema:"evaluation timestamp for the instant query. Accepts: Unix epoch seconds, RFC3339, now, now-<duration>, now+<duration> (e.g. now-1h), or a duration string relative to now e.g. 5m, 1h30m, etc. Defaults to current time."`
 	TruncatableInput
 }
 
