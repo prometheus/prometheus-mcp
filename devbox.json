@@ -3,10 +3,10 @@
   "packages": [
     "uv@latest",
     "go@latest",
-    "golangci-lint@latest",
     "nodejs@22",
     "chart-testing@latest",
-    "kubernetes-helm@latest"
+    "kubernetes-helm@latest",
+    "golangci-lint@2.13.1"
   ],
   "shell": {
     "init_hook": [
