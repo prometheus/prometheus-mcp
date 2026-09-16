@@ -842,7 +842,9 @@ func (s *ServerContainer) metricMetadataAPICall(ctx context.Context, metric, lim
 		return "", fmt.Errorf("failed to encode metric metadata: %w", err)
 	}
 
-	if limitInt != 0 {
+	// A full response means Prometheus hit `limit`. The API gives no "more
+	// available" signal, so an exact fit warns too.
+	if metric == "" && limitInt > 0 && len(mm) >= limitInt {
 		encodedData += displayTruncationWarning(limitInt)
 	}
 
@@ -894,7 +896,7 @@ func (s *ServerContainer) targetsMetadataAPICall(ctx context.Context, matchTarge
 		return "", fmt.Errorf("failed to encode target metadata: %w", err)
 	}
 
-	if limitInt != 0 {
+	if limitInt > 0 && len(tm) >= limitInt {
 		encodedData += displayTruncationWarning(limitInt)
 	}
 

@@ -946,8 +946,49 @@ func TestMetricMetadataHandler(t *testing.T) {
 				require.NoError(t, err)
 				require.False(t, isError)
 				require.Contains(t, result, "up")
-				// When a non-zero limit is used, a truncation warning is appended.
+				// The result is well under the limit, so nothing was truncated.
+				require.NotContains(t, result, "truncated")
+			},
+		},
+		{
+			name: "result at the limit warns about truncation",
+			args: map[string]any{
+				"limit": "3",
+			},
+			mockMetadataFunc: func(ctx context.Context, metric string, limit string) (map[string][]promv1.Metadata, error) {
+				require.Equal(t, "3", limit)
+				return map[string][]promv1.Metadata{
+					"up":                     {{Type: "gauge", Help: "Target status", Unit: ""}},
+					"http_requests_total":    {{Type: "counter", Help: "Total HTTP requests", Unit: ""}},
+					"node_cpu_seconds_total": {{Type: "counter", Help: "CPU seconds", Unit: ""}},
+				}, nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "up")
+				// The response holds as many metric families as the limit
+				// allows, so it may have been capped.
 				require.Contains(t, result, "truncated")
+			},
+		},
+		{
+			name: "named metric at the limit does not warn",
+			args: map[string]any{
+				"metric": "up",
+				"limit":  "1",
+			},
+			mockMetadataFunc: func(ctx context.Context, metric string, limit string) (map[string][]promv1.Metadata, error) {
+				return map[string][]promv1.Metadata{
+					"up": {{Type: "gauge", Help: "Target status", Unit: ""}},
+				}, nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				// One family is all a named metric can return, so a limit
+				// of 1 cannot have cut anything.
+				require.NotContains(t, result, "truncated")
 			},
 		},
 		{
@@ -964,8 +1005,9 @@ func TestMetricMetadataHandler(t *testing.T) {
 				require.NoError(t, err)
 				require.False(t, isError)
 				require.Contains(t, result, "up")
-				// The global truncation limit triggers a truncation warning.
-				require.Contains(t, result, "truncated")
+				// The single result is far below the global truncation
+				// limit, so nothing was truncated.
+				require.NotContains(t, result, "truncated")
 			},
 		},
 	}
@@ -1021,6 +1063,31 @@ func TestTargetsMetadataHandler(t *testing.T) {
 				require.False(t, isError)
 				require.Contains(t, result, "http_requests_total")
 				require.Contains(t, result, "prometheus")
+				// The single result is well under the limit, so nothing
+				// was truncated.
+				require.NotContains(t, result, "truncated")
+			},
+		},
+		{
+			name: "result at the limit warns about truncation",
+			args: map[string]any{
+				"limit": "3",
+			},
+			mockTargetsMetadataFunc: func(ctx context.Context, matchTarget string, metric string, limit string) ([]promv1.MetricMetadata, error) {
+				require.Equal(t, "3", limit)
+				return []promv1.MetricMetadata{
+					{Target: map[string]string{"job": "prometheus"}, Metric: "http_requests_total", Type: "counter", Help: "Total HTTP requests"},
+					{Target: map[string]string{"job": "prometheus"}, Metric: "up", Type: "gauge", Help: "Target status"},
+					{Target: map[string]string{"job": "node"}, Metric: "node_cpu_seconds_total", Type: "counter", Help: "CPU seconds"},
+				}, nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "http_requests_total")
+				// The response holds as many entries as the limit allows,
+				// so it may have been capped.
+				require.Contains(t, result, "truncated")
 			},
 		},
 		{
