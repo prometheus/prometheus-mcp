@@ -15,7 +15,9 @@ package mcp
 
 import (
 	"encoding/json"
+	"slices"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -26,6 +28,23 @@ import (
 //
 // See: https://github.com/prometheus/prometheus-mcp/issues/119
 var emptyInputSchema = json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`)
+
+// inputSchemaFor infers the input schema for T with every nullable property
+// collapsed to its non-null type. Provides better support for single-type
+// schema dialects such as Gemini's reject.
+func inputSchemaFor[T any]() *jsonschema.Schema {
+	s, err := jsonschema.For[T](nil)
+	if err != nil {
+		panic(err)
+	}
+	for _, p := range s.Properties {
+		p.Types = slices.DeleteFunc(slices.Clone(p.Types), func(t string) bool { return t == "null" })
+		if len(p.Types) == 1 {
+			p.Type, p.Types = p.Types[0], nil
+		}
+	}
+	return s
+}
 
 // ptr returns a pointer to the given value.
 //
@@ -67,6 +86,7 @@ var (
 	seriesToolDef = &mcp.Tool{
 		Name:        "series",
 		Description: "Finds series by label matches",
+		InputSchema: inputSchemaFor[SeriesInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "Find Series",
 			ReadOnlyHint: true,
@@ -76,6 +96,7 @@ var (
 	labelNamesToolDef = &mcp.Tool{
 		Name:        "label_names",
 		Description: "Returns the unique label names present in the block in sorted order by given time range and matches",
+		InputSchema: inputSchemaFor[LabelNamesInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "Label Names",
 			ReadOnlyHint: true,
@@ -85,6 +106,7 @@ var (
 	labelValuesToolDef = &mcp.Tool{
 		Name:        "label_values",
 		Description: "Performs a query for the values of the given label, time range and matches",
+		InputSchema: inputSchemaFor[LabelValuesInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "Label Values",
 			ReadOnlyHint: true,
@@ -223,6 +245,7 @@ var (
 	deleteSeriesToolDef = &mcp.Tool{
 		Name:        "delete_series",
 		Description: "Deletes data for a selection of series in a time range. Both start_time and end_time are required to prevent accidental deletion of all data. Deletion creates tombstones; run clean_tombstones or wait for compaction to reclaim disk space. Confirm the time range and matchers with the user before calling.",
+		InputSchema: inputSchemaFor[DeleteSeriesInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Delete Series",
 			DestructiveHint: ptr(true),
