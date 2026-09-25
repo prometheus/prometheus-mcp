@@ -15,7 +15,9 @@ package mcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"testing"
 
@@ -305,6 +307,9 @@ func TestToolsetContents(t *testing.T) {
 // the SDK produces for tools that accept parameters, and any explicit
 // schemas set for parameter-less (EmptyInput) tools.
 //
+// It also verifies that no schema node declares "type" as an array, since
+// single-type dialects such as Gemini's reject them.
+//
 // See: https://github.com/prometheus/prometheus-mcp/issues/119
 func TestToolInputSchemaProperties(t *testing.T) {
 	container := newTestContainer(nil)
@@ -313,6 +318,9 @@ func TestToolInputSchemaProperties(t *testing.T) {
 		"prometheus": prometheusToolset,
 		"thanos":     thanosToolset,
 	}
+
+	// Tools whose "matches" input is a []string.
+	matchesTools := []string{"series", "label_names", "label_values", "delete_series"}
 
 	for tsName, toolset := range toolsets {
 		t.Run(tsName, func(t *testing.T) {
@@ -336,7 +344,49 @@ func TestToolInputSchemaProperties(t *testing.T) {
 
 				_, hasProperties := schema["properties"]
 				require.Truef(t, hasProperties, "%s/%s: InputSchema missing 'properties' key (required for OpenAI API compatibility)", tsName, tool.Name)
+
+				requireSingleTypeSchema(t, tsName+"/"+tool.Name, "(root)", schema)
+
+				if slices.Contains(matchesTools, tool.Name) {
+					props, _ := schema["properties"].(map[string]any)
+					matches, ok := props["matches"].(map[string]any)
+					require.Truef(t, ok, "%s/%s: InputSchema missing 'matches' property", tsName, tool.Name)
+					matches = maps.Clone(matches)
+					delete(matches, "description")
+					require.Equalf(t, map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, matches,
+						"%s/%s: unexpected 'matches' schema", tsName, tool.Name)
+				}
 			}
 		})
+	}
+}
+
+// requireSingleTypeSchema fails if node or any schema nested under it declares
+// "type" as an array.
+func requireSingleTypeSchema(t *testing.T, tool, path string, node map[string]any) {
+	t.Helper()
+
+	_, isArray := node["type"].([]any)
+	require.Falsef(t, isArray, "%s: %s has type %v; single-type schema dialects such as Gemini's reject type arrays, set the tool's InputSchema with inputSchemaFor", tool, path, node["type"])
+
+	if props, ok := node["properties"].(map[string]any); ok {
+		for name, prop := range props {
+			if sub, ok := prop.(map[string]any); ok {
+				requireSingleTypeSchema(t, tool, path+".properties."+name, sub)
+			}
+		}
+	}
+	for _, key := range []string{"items", "additionalProperties"} {
+		if sub, ok := node[key].(map[string]any); ok {
+			requireSingleTypeSchema(t, tool, path+"."+key, sub)
+		}
+	}
+	for _, key := range []string{"anyOf", "oneOf", "allOf"} {
+		subs, _ := node[key].([]any)
+		for i, s := range subs {
+			if sub, ok := s.(map[string]any); ok {
+				requireSingleTypeSchema(t, tool, fmt.Sprintf("%s.%s[%d]", path, key, i), sub)
+			}
+		}
 	}
 }
