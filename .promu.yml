@@ -40,6 +40,7 @@ crossbuild:
         - linux/mips64
         - linux/mips64le
         - linux/s390x
+        - linux/riscv64
 tarball:
     files:
         - LICENSE
