@@ -1,0 +1,1 @@
+[{"metric":{"__name__":"up","instance":"localhost:9090","job":"prometheus"},"value":[1700000000,"1"]},{"metric":{"__name__":"up","instance":"localhost:9100","job":"node"},"value":[1700000000,"0"]}]
