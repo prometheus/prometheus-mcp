@@ -27,7 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/alpkeskin/gotoon"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
@@ -36,6 +35,7 @@ import (
 	"github.com/prometheus/common/promslog"
 	promversion "github.com/prometheus/common/version"
 	"github.com/tmc/langchaingo/textsplitter"
+	"github.com/toon-format/toon-go"
 
 	"github.com/prometheus/prometheus-mcp/internal/metrics"
 	mcpProm "github.com/prometheus/prometheus-mcp/pkg/prometheus"
@@ -391,20 +391,28 @@ func (s *ServerContainer) createClientWithAuth(authorization string) (promv1.API
 
 // FormatOutput encodes data as JSON or TOON based on configuration.
 func (s *ServerContainer) FormatOutput(data any) (string, error) {
-	if s.toonOutputEnabled {
-		toonEncoded, err := gotoon.Encode(data)
-		if err != nil {
-			return "", fmt.Errorf("failed to TOON encode data: %w", err)
-		}
-
-		return toonEncoded, nil
-	}
-
 	jsonEncoded, err := json.Marshal(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to JSON marshal data: %w", err)
 	}
-	return string(jsonEncoded), nil
+	if !s.toonOutputEnabled {
+		return string(jsonEncoded), nil
+	}
+
+	// TOON is defined over the JSON data model; encode the decoded JSON,
+	// rather than the Go value. This keeps JSON tags, omitempty and
+	// MarshalJSON identical to JSON mode. It also avoids using
+	// client_golang's named string types, which toon-go rejects.
+	var generic any
+	if err := json.Unmarshal(jsonEncoded, &generic); err != nil {
+		return "", fmt.Errorf("failed to JSON unmarshal data: %w", err)
+	}
+
+	toonEncoded, err := toon.MarshalString(generic)
+	if err != nil {
+		return "", fmt.Errorf("failed to TOON encode data: %w", err)
+	}
+	return toonEncoded, nil
 }
 
 // GetEffectiveTruncationLimit returns the per-call limit if set, otherwise the global limit.
