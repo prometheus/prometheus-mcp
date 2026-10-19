@@ -721,7 +721,7 @@ func (s *ServerContainer) exemplarQueryAPICall(ctx context.Context, query string
 
 	var resultSB strings.Builder
 	for _, r := range res {
-		b, err := json.Marshal(r)
+		b, err := marshalJSONNoEscapeHTML(r)
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal exemplar: %w", err)
 		}
