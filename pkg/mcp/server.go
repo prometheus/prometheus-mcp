@@ -14,6 +14,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
@@ -389,9 +390,22 @@ func (s *ServerContainer) createClientWithAuth(authorization string) (promv1.API
 	return client, rt
 }
 
+// marshalJSONNoEscapeHTML is json.Marshal without HTML escaping. Tool results
+// are read by a model as text, and escaping <, > and & as \u003c-style
+// sequences costs tokens without protecting anything.
+func marshalJSONNoEscapeHTML(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+}
+
 // FormatOutput encodes data as JSON or TOON based on configuration.
 func (s *ServerContainer) FormatOutput(data any) (string, error) {
-	jsonEncoded, err := json.Marshal(data)
+	jsonEncoded, err := marshalJSONNoEscapeHTML(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to JSON marshal data: %w", err)
 	}
