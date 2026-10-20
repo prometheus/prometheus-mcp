@@ -1,0 +1,1 @@
+[{"target":{"instance":"localhost:9090","job":"prometheus"},"metric":"http_requests_total","type":"counter","help":"Requests with latency <= 1s & status < 500","unit":""},{"target":{"instance":"localhost:9100","job":"node"},"type":"gauge","help":"1 => the exporter is up, 0 => it is down","unit":""}]

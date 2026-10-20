@@ -1,0 +1,4 @@
+activeAlertManagers[2]{url}:
+  "http://am-0:9093/api/v2/alerts"
+  "http://am-1:9093/api/v2/alerts"
+droppedAlertManagers: []
