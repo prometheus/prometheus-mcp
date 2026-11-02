@@ -1,0 +1,47 @@
+---
+# Finishes the v0.19.0-rc.0 release, whose publish_release job pushed the
+# per-arch images but failed to create the multi-arch manifests. Re-running
+# the release workflow would check out the tagged commit and run the same
+# broken Makefile.common again.
+name: Repair v0.19.0-rc.0 Docker manifests
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repair:
+    if: github.repository_owner == 'prometheus'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write  # push to ghcr.io via github.token
+    env:
+      TAG: v0.19.0-rc.0
+      ARCHS: amd64 arm64 armv7 ppc64le riscv64 s390x
+    steps:
+      - name: Login
+        env:
+          DOCKER_HUB_PASSWORD: ${{ secrets.docker_hub_password }}
+          QUAY_IO_PASSWORD: ${{ secrets.quay_io_password }}
+          GHCR_IO_PASSWORD: ${{ github.token }}
+        run: |
+          echo "$DOCKER_HUB_PASSWORD" | docker login docker.io -u prombot --password-stdin
+          echo "$QUAY_IO_PASSWORD" | docker login quay.io -u prombot --password-stdin
+          echo "$GHCR_IO_PASSWORD" | docker login ghcr.io -u prometheus --password-stdin
+
+      # Referencing the platform manifest by digest makes imagetools take the
+      # platform from the image config (linux/arm/v7, not linux/armv7).
+      - name: Create multi-arch manifests
+        run: |
+          for repo in docker.io/prom quay.io/prometheus ghcr.io/prometheus; do
+            img="$repo/prometheus-mcp"
+            args=()
+            for arch in $ARCHS; do
+              digest=$(docker buildx imagetools inspect --raw "$img-linux-$arch:$TAG" \
+                | jq -r '.manifests[] | select(.platform.os == "linux") | .digest')
+              args+=("$img-linux-$arch@$digest")
+            done
+            docker buildx imagetools create -t "$img:$TAG" "${args[@]}"
+            docker buildx imagetools inspect "$img:$TAG"
+          done
