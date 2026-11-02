@@ -14,7 +14,7 @@ require (
 	github.com/prometheus/common v0.72.0
 	github.com/prometheus/exporter-toolkit v0.20.0
 	github.com/stretchr/testify v1.12.1
-	github.com/tmc/langchaingo v0.1.14
+	github.com/tmc/langchaingo v0.1.15
 	gopkg.in/yaml.v3 v3.0.1
 )
 
