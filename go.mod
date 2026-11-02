@@ -4,7 +4,6 @@ go 1.27.0
 
 require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/alpkeskin/gotoon v0.1.1
 	github.com/blevesearch/bleve/v2 v2.6.1
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/google/jsonschema-go v0.4.3
@@ -15,6 +14,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.20.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tmc/langchaingo v0.1.14
+	github.com/toon-format/toon-go v1.0.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 

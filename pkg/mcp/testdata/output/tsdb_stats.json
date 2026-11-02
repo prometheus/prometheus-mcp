@@ -1,0 +1,1 @@
+{"headStats":{"numSeries":0,"numLabelPairs":0,"chunkCount":0,"minTime":9223372036854775807,"maxTime":-9223372036854775808},"seriesCountByMetricName":[{"name":"up","value":2},{"name":"http_requests_total","value":1}],"labelValueCountByLabelName":[{"name":"__name__","value":2}],"memoryInBytesByLabelName":[],"seriesCountByLabelValuePair":[{"name":"job=prometheus","value":2}]}
