@@ -337,8 +337,10 @@ func (s *ServerContainer) FlagsHandler(ctx context.Context, req *mcp.CallToolReq
 }
 
 // ListAlertsHandler handles the list alerts tool.
-func (s *ServerContainer) ListAlertsHandler(ctx context.Context, req *mcp.CallToolRequest, input EmptyInput) (*mcp.CallToolResult, any, error) {
-	return callAPIAndReturnToolResult(ctx, s.listAlertsAPICall, "failed making list alerts api call: ")
+func (s *ServerContainer) ListAlertsHandler(ctx context.Context, req *mcp.CallToolRequest, input TruncatableInput) (*mcp.CallToolResult, any, error) {
+	return callAPIAndReturnToolResult(ctx, func(ctx context.Context) (string, error) {
+		return s.listAlertsAPICall(ctx, s.GetEffectiveTruncationLimit(input.TruncationLimit))
+	}, "failed making list alerts api call: ")
 }
 
 // TsdbStatsHandler handles the TSDB stats tool.
@@ -936,11 +938,27 @@ func (s *ServerContainer) flagsAPICall(ctx context.Context) (string, error) {
 		})
 }
 
-func (s *ServerContainer) listAlertsAPICall(ctx context.Context) (string, error) {
-	return s.doSimpleAPICall(ctx, "/api/v1/alerts", "failed to get alerts from Prometheus",
+func (s *ServerContainer) listAlertsAPICall(ctx context.Context, truncationLimit int) (string, error) {
+	truncated := false
+	result, err := s.doSimpleAPICall(ctx, "/api/v1/alerts", "failed to get alerts from Prometheus",
 		func(ctx context.Context, client promv1.API) (any, error) {
-			return client.Alerts(ctx)
+			alerts, err := client.Alerts(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if truncationLimit > 0 && len(alerts.Alerts) > truncationLimit {
+				alerts.Alerts = alerts.Alerts[:truncationLimit]
+				truncated = true
+			}
+			return alerts, nil
 		})
+	if err != nil {
+		return "", err
+	}
+	if truncated {
+		result += displayTruncationWarning(truncationLimit)
+	}
+	return result, nil
 }
 
 func (s *ServerContainer) tsdbStatsAPICall(ctx context.Context) (string, error) {
