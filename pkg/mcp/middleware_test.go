@@ -737,7 +737,7 @@ func TestFullAuthFlow(t *testing.T) {
 
 		client, _ := container.GetAPIClient(ctx)
 
-		_, _, err = client.Query(ctx, "up", time.Now())
+		_, _, _, err = client.Query(ctx, "up", time.Now())
 		require.NoError(t, err)
 
 		require.Equal(t, "Bearer test-token", prometheusReceivedAuth)

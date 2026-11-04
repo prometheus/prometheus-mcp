@@ -678,7 +678,7 @@ func (s *ServerContainer) queryAPICall(ctx context.Context, query string, ts tim
 
 	path := "/api/v1/query"
 	startTs := time.Now()
-	result, warnings, err := client.Query(ctx, query, ts)
+	result, warnings, _, err := client.Query(ctx, query, ts)
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -695,7 +695,7 @@ func (s *ServerContainer) rangeQueryAPICall(ctx context.Context, query string, s
 
 	path := "/api/v1/query_range"
 	startTs := time.Now()
-	result, warnings, err := client.QueryRange(ctx, query, promv1.Range{Start: start, End: end, Step: step})
+	result, warnings, _, err := client.QueryRange(ctx, query, promv1.Range{Start: start, End: end, Step: step})
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -738,7 +738,7 @@ func (s *ServerContainer) seriesAPICall(ctx context.Context, matches []string, s
 
 	path := "/api/v1/series"
 	startTs := time.Now()
-	result, warnings, err := client.Series(ctx, matches, start, end)
+	result, warnings, _, err := client.Series(ctx, matches, start, end)
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -760,7 +760,7 @@ func (s *ServerContainer) labelNamesAPICall(ctx context.Context, matches []strin
 
 	path := "/api/v1/labels"
 	startTs := time.Now()
-	result, warnings, err := client.LabelNames(ctx, matches, start, end)
+	result, warnings, _, err := client.LabelNames(ctx, matches, start, end)
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -782,7 +782,7 @@ func (s *ServerContainer) labelValuesAPICall(ctx context.Context, label string, 
 
 	path := "/api/v1/label/:name/values"
 	startTs := time.Now()
-	result, warnings, err := client.LabelValues(ctx, label, matches, start, end)
+	result, warnings, _, err := client.LabelValues(ctx, label, matches, start, end)
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
