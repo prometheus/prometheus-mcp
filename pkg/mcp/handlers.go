@@ -1059,14 +1059,10 @@ func (s *ServerContainer) doHTTPRequest(ctx context.Context, method string, rt h
 	}
 	req.Header.Set("Accept", "application/json")
 
-	// Reuse the cached client for the default transport to share its idle
-	// connection pool. For auth-overridden transports create a one-off client.
-	var httpClient *http.Client
-	if rt == s.defaultHTTPClient.Transport {
-		httpClient = &s.defaultHTTPClient
-	} else {
-		httpClient = &http.Client{Transport: rt}
-	}
+	// The idle connection pool lives in the transport, so a client per call
+	// still reuses connections. Comparing rt to pick a cached client would
+	// panic when rt has an uncomparable type, such as a func.
+	httpClient := &http.Client{Transport: rt}
 
 	startTs := time.Now()
 	resp, err := httpClient.Do(req)

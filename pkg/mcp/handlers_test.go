@@ -81,6 +81,15 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 	return nil, errors.New("RoundTripFunc not set")
 }
 
+// roundTripFunc is a func-backed http.RoundTripper. Values of a func type
+// can't be compared with ==.
+type roundTripFunc func(req *http.Request) (*http.Response, error)
+
+// RoundTrip implements http.RoundTripper.
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
 // newMockHTTPResponse creates a mock HTTP response with the given status code and body.
 func newMockHTTPResponse(statusCode int, body string) *http.Response {
 	return &http.Response{
@@ -2160,6 +2169,30 @@ func TestHealthyHandler(t *testing.T) {
 			tc.validateResult(t, resultText, isError, err)
 		})
 	}
+}
+
+func TestHealthyHandlerWithFuncRoundTripper(t *testing.T) {
+	t.Parallel()
+
+	// Build through the real constructor so the func-backed transport becomes
+	// the default one, as it would for a library caller.
+	container, err := newServerContainer(ServerConfig{
+		Logger:            slog.Default(),
+		PrometheusURL:     "http://localhost:9090",
+		PrometheusTimeout: 30 * time.Second,
+		RoundTripper: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return newMockHTTPResponse(http.StatusOK, "Prometheus Server is Healthy.\n"), nil
+		}),
+	})
+	require.NoError(t, err)
+
+	ts := mcptest.NewTestServer(t)
+	mcptest.AddTool(ts, healthyToolDef, container.HealthyHandler)
+
+	result, err := ts.CallTool(ts.Context(), "healthy", map[string]any{})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.Contains(t, mcptest.GetResultText(result), "Prometheus Server is Healthy")
 }
 
 func TestReadyHandler(t *testing.T) {
