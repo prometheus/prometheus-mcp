@@ -83,7 +83,7 @@ Please see [Flags](#command-line-flags) for more information on the available fl
 | `healthy` | Management API endpoint that can be used to check Prometheus health |
 | `label_names` | Returns the unique label names present in the block in sorted order by given time range and matchers |
 | `label_values` | Performs a query for the values of the given label, time range and matchers |
-| `list_alerts` | List all active alerts |
+| `list_alerts` | List active alerts, with optional `truncation_limit` in alert entries (defaults to the global limit, `-1` disables truncation) |
 | `list_rules` | List all alerting and recording rules that are loaded |
 | `list_targets` | Get overview of Prometheus target discovery |
 | `metric_metadata` | Returns metadata about metrics currently scraped by the metric name | 

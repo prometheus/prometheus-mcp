@@ -1558,6 +1558,74 @@ func TestListAlertsHandler(t *testing.T) {
 	}
 }
 
+func TestListAlertsHandlerTruncation(t *testing.T) {
+	t.Parallel()
+	alerts := []promv1.Alert{
+		{
+			Labels:      model.LabelSet{"alertname": "HighMemoryUsage", "severity": "warning"},
+			Annotations: model.LabelSet{"summary": "Memory usage is high\nCheck the affected instance"},
+			State:       promv1.AlertStateFiring,
+		},
+		{
+			Labels:      model.LabelSet{"alertname": "HighCPUUsage"},
+			Annotations: model.LabelSet{"summary": "CPU usage is high"},
+			State:       promv1.AlertStatePending,
+		},
+		{
+			Labels: model.LabelSet{"alertname": "DiskFull"},
+			State:  promv1.AlertStateFiring,
+		},
+	}
+	testCases := []struct {
+		name        string
+		globalLimit int
+		args        map[string]any
+		alerts      []promv1.Alert
+		wantAlerts  []promv1.Alert
+		wantLimit   int
+	}{
+		{name: "unlimited", alerts: alerts, wantAlerts: alerts},
+		{name: "global limit", globalLimit: 1, alerts: alerts, wantAlerts: alerts[:1], wantLimit: 1},
+		{name: "explicit zero uses global limit", globalLimit: 1, args: map[string]any{"truncation_limit": 0}, alerts: alerts, wantAlerts: alerts[:1], wantLimit: 1},
+		{name: "per-call limit", args: map[string]any{"truncation_limit": 2}, alerts: alerts, wantAlerts: alerts[:2], wantLimit: 2},
+		{name: "per-call limit overrides global", globalLimit: 1, args: map[string]any{"truncation_limit": 2}, alerts: alerts, wantAlerts: alerts[:2], wantLimit: 2},
+		{name: "per-call limit lowers global", globalLimit: 2, args: map[string]any{"truncation_limit": 1}, alerts: alerts, wantAlerts: alerts[:1], wantLimit: 1},
+		{name: "per-call disables truncation", globalLimit: 1, args: map[string]any{"truncation_limit": -1}, alerts: alerts, wantAlerts: alerts},
+		{name: "exact limit", globalLimit: 3, alerts: alerts, wantAlerts: alerts},
+		{name: "below limit", globalLimit: 4, alerts: alerts, wantAlerts: alerts},
+		{name: "empty alerts", globalLimit: 1, alerts: []promv1.Alert{}, wantAlerts: []promv1.Alert{}},
+		{name: "nil alerts", globalLimit: 1},
+	}
+	for _, toon := range []bool{false, true} {
+		for _, tc := range testCases {
+			t.Run(fmt.Sprintf("%s/toon=%t", tc.name, toon), func(t *testing.T) {
+				mockAPI := &MockPrometheusAPI{AlertsFunc: func(context.Context) (promv1.AlertsResult, error) {
+					return promv1.AlertsResult{Alerts: tc.alerts}, nil
+				}}
+				container := newTestContainer(mockAPI)
+				container.truncationLimit = tc.globalLimit
+				container.toonOutputEnabled = toon
+				ts := mcptest.NewTestServer(t)
+				mcptest.AddTool(ts, listAlertsToolDef, container.ListAlertsHandler)
+
+				args := tc.args
+				if args == nil {
+					args = map[string]any{}
+				}
+				result, err := ts.CallTool(ts.Context(), "list_alerts", args)
+				require.NoError(t, err)
+				require.False(t, result.IsError)
+				want, err := container.FormatOutput(promv1.AlertsResult{Alerts: tc.wantAlerts})
+				require.NoError(t, err)
+				if tc.wantLimit > 0 {
+					want += displayTruncationWarning(tc.wantLimit)
+				}
+				require.Equal(t, want, mcptest.GetResultText(result))
+			})
+		}
+	}
+}
+
 func TestAlertmanagersHandler(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

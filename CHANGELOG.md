@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* [ENHANCEMENT] mcp: apply the global and per-call truncation limits to `list_alerts`, keeping complete alert entries.
+
 ## 0.19.0-rc.0 / 2026-11-01
 
 This is the first release under the Prometheus org! See the changelog below for details on the renamed binaries, environment variables, images, and packages. See the README for up to date documentation.
