@@ -239,7 +239,7 @@ func (m *MockPrometheusAPI) FormatQuery(ctx context.Context, query string) (stri
 	}
 	return "", nil
 }
-func (m *MockPrometheusAPI) LabelNames(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, error) {
+func (m *MockPrometheusAPI) LabelNames(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelNames, promv1.Warnings, promv1.Infos, error) {
 	// Record the call for verification.
 	m.mu.Lock()
 	m.LabelNamesCalls = append(m.LabelNamesCalls, LabelNamesCall{
@@ -250,11 +250,12 @@ func (m *MockPrometheusAPI) LabelNames(ctx context.Context, matches []string, st
 	m.mu.Unlock()
 
 	if m.LabelNamesFunc != nil {
-		return m.LabelNamesFunc(ctx, matches, startTime, endTime, opts...)
+		res, warnings, err := m.LabelNamesFunc(ctx, matches, startTime, endTime, opts...)
+		return res, warnings, nil, err
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
-func (m *MockPrometheusAPI) LabelValues(ctx context.Context, label string, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelValues, promv1.Warnings, error) {
+func (m *MockPrometheusAPI) LabelValues(ctx context.Context, label string, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) (model.LabelValues, promv1.Warnings, promv1.Infos, error) {
 	// Record the call for verification.
 	m.mu.Lock()
 	m.LabelValuesCalls = append(m.LabelValuesCalls, LabelValuesCall{
@@ -266,9 +267,10 @@ func (m *MockPrometheusAPI) LabelValues(ctx context.Context, label string, match
 	m.mu.Unlock()
 
 	if m.LabelValuesFunc != nil {
-		return m.LabelValuesFunc(ctx, label, matches, startTime, endTime, opts...)
+		res, warnings, err := m.LabelValuesFunc(ctx, label, matches, startTime, endTime, opts...)
+		return res, warnings, nil, err
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 func (m *MockPrometheusAPI) Metadata(ctx context.Context, metric string, limit string) (map[string][]promv1.Metadata, error) {
 	// Record the call for verification.
@@ -284,7 +286,7 @@ func (m *MockPrometheusAPI) Metadata(ctx context.Context, metric string, limit s
 	}
 	return nil, nil
 }
-func (m *MockPrometheusAPI) Query(ctx context.Context, query string, ts time.Time, opts ...promv1.Option) (model.Value, promv1.Warnings, error) {
+func (m *MockPrometheusAPI) Query(ctx context.Context, query string, ts time.Time, opts ...promv1.Option) (model.Value, promv1.Warnings, promv1.Infos, error) {
 	// Record the call for verification.
 	m.mu.Lock()
 	m.QueryCalls = append(m.QueryCalls, QueryCall{
@@ -294,9 +296,10 @@ func (m *MockPrometheusAPI) Query(ctx context.Context, query string, ts time.Tim
 	m.mu.Unlock()
 
 	if m.QueryFunc != nil {
-		return m.QueryFunc(ctx, query, ts, opts...)
+		res, warnings, err := m.QueryFunc(ctx, query, ts, opts...)
+		return res, warnings, nil, err
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 func (m *MockPrometheusAPI) QueryExemplars(ctx context.Context, query string, startTime time.Time, endTime time.Time) ([]promv1.ExemplarQueryResult, error) {
 	if m.QueryExemplarsFunc != nil {
@@ -304,7 +307,7 @@ func (m *MockPrometheusAPI) QueryExemplars(ctx context.Context, query string, st
 	}
 	return nil, nil
 }
-func (m *MockPrometheusAPI) QueryRange(ctx context.Context, query string, r promv1.Range, opts ...promv1.Option) (model.Value, promv1.Warnings, error) {
+func (m *MockPrometheusAPI) QueryRange(ctx context.Context, query string, r promv1.Range, opts ...promv1.Option) (model.Value, promv1.Warnings, promv1.Infos, error) {
 	// Record the call for verification.
 	m.mu.Lock()
 	m.QueryRangeCalls = append(m.QueryRangeCalls, QueryRangeCall{
@@ -314,9 +317,10 @@ func (m *MockPrometheusAPI) QueryRange(ctx context.Context, query string, r prom
 	m.mu.Unlock()
 
 	if m.QueryRangeFunc != nil {
-		return m.QueryRangeFunc(ctx, query, r, opts...)
+		res, warnings, err := m.QueryRangeFunc(ctx, query, r, opts...)
+		return res, warnings, nil, err
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 func (m *MockPrometheusAPI) Rules(ctx context.Context, matches []string) (promv1.RulesResult, error) {
 	if m.RulesFunc != nil {
@@ -330,7 +334,7 @@ func (m *MockPrometheusAPI) Runtimeinfo(ctx context.Context) (promv1.Runtimeinfo
 	}
 	return promv1.RuntimeinfoResult{}, nil
 }
-func (m *MockPrometheusAPI) Series(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]model.LabelSet, promv1.Warnings, error) {
+func (m *MockPrometheusAPI) Series(ctx context.Context, matches []string, startTime time.Time, endTime time.Time, opts ...promv1.Option) ([]model.LabelSet, promv1.Warnings, promv1.Infos, error) {
 	// Record the call for verification.
 	m.mu.Lock()
 	m.SeriesCalls = append(m.SeriesCalls, SeriesCall{
@@ -341,9 +345,10 @@ func (m *MockPrometheusAPI) Series(ctx context.Context, matches []string, startT
 	m.mu.Unlock()
 
 	if m.SeriesFunc != nil {
-		return m.SeriesFunc(ctx, matches, startTime, endTime, opts...)
+		res, warnings, err := m.SeriesFunc(ctx, matches, startTime, endTime, opts...)
+		return res, warnings, nil, err
 	}
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 func (m *MockPrometheusAPI) Snapshot(ctx context.Context, skipHead bool) (promv1.SnapshotResult, error) {
 	if m.SnapshotFunc != nil {
