@@ -245,21 +245,22 @@ The old variable names are ignored without an error, so rename them when you upg
 
 ### Docker
 Please see [Flags](#command-line-flags) for more information on the available flags and their corresponding environment variables.
+The examples below use `prom/prometheus-mcp:latest` from Docker Hub. You can also use `quay.io/prometheus/prometheus-mcp:latest`.
 
 ```shell
 # Stdio transport
-docker run --rm -i ghcr.io/tjhop/prometheus-mcp-server:latest --prometheus.url "https://$yourPrometheus:9090" 
+docker run --rm -i prom/prometheus-mcp:latest --prometheus.url "https://$yourPrometheus:9090"
 
 # or using env vars
-docker run --rm -i -e PROMETHEUS_MCP_SERVER_PROMETHEUS_URL="https://$yourPrometheus:9090" ghcr.io/tjhop/prometheus-mcp-server:latest
+docker run --rm -i -e PROMETHEUS_MCP_PROMETHEUS_URL="https://$yourPrometheus:9090" prom/prometheus-mcp:latest
 ```
 
 ```shell
 # HTTP transport
-docker run --rm -p 8080:8080 ghcr.io/tjhop/prometheus-mcp-server:latest --prometheus.url "https://$yourPrometheus:9090" --mcp.transport "http" --web.listen-address ":8080"
+docker run --rm -p 8080:8080 prom/prometheus-mcp:latest --prometheus.url "https://$yourPrometheus:9090" --mcp.transport "http" --web.listen-address ":8080"
 
 # or using env vars
-docker run --rm -p 8080:8080 -e PROMETHEUS_MCP_SERVER_PROMETHEUS_URL="https://$yourPrometheus:9090" -e PROMETHEUS_MCP_SERVER_MCP_TRANSPORT="http" -e PROMETHEUS_MCP_SERVER_WEB_LISTEN_ADDRESS=":8080" ghcr.io/tjhop/prometheus-mcp-server:latest
+docker run --rm -p 8080:8080 -e PROMETHEUS_MCP_PROMETHEUS_URL="https://$yourPrometheus:9090" -e PROMETHEUS_MCP_MCP_TRANSPORT="http" -e PROMETHEUS_MCP_WEB_LISTEN_ADDRESS=":8080" prom/prometheus-mcp:latest
 ```
 
 ### Helm Chart (Kubernetes)
