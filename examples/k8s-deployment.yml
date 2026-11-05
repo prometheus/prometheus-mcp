@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: prometheus-mcp
-        image: ghcr.io/prometheus/prometheus-mcp:v0.19.0-rc.0
+        image: prom/prometheus-mcp:latest
         args:
         - '--prometheus.url=http://prometheus-service.prometheus.svc:9090' # set your prometheus url here
         - '--mcp.transport=http'
