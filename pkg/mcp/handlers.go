@@ -1087,10 +1087,9 @@ func (s *ServerContainer) doHTTPRequest(ctx context.Context, method string, rt h
 		return "", fmt.Errorf("received non-ok HTTP status code: %d", resp.StatusCode)
 	}
 
-	// TODO(@tjhop): add an io.LimitReader and enforce max response body
-	// size? Should it be user configurable (flag)?
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		metricAPICallsFailed.With(prometheus.Labels{"target_path": requestPath}).Inc()
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 

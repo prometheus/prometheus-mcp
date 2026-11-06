@@ -106,6 +106,14 @@ var (
 			" To disable truncation limits, set to 0.",
 	).Default("0").Int()
 
+	flagPrometheusMaxResponseSize = kingpin.Flag(
+		"prometheus.max-response-size",
+		"Maximum size of a single response body from the Prometheus API, e.g. 64MiB."+
+			" A larger response fails the tool call with an error instead of being loaded into memory."+
+			" One tool call can hold several times this size in memory."+
+			" To disable the limit, set to 0.",
+	).Default("0").Bytes()
+
 	flagHTTPConfig = kingpin.Flag(
 		"http.config",
 		"Path to config file to set Prometheus HTTP client options",
@@ -212,6 +220,10 @@ func main() {
 		logger.Error("Failed to load HTTP config file", "file", *flagHTTPConfig, "err", err)
 		os.Exit(1) //nolint:gocritic
 	}
+	if *flagPrometheusMaxResponseSize < 0 {
+		logger.Error("--prometheus.max-response-size must not be negative", "value", int64(*flagPrometheusMaxResponseSize))
+		os.Exit(1)
+	}
 
 	ctx, rootCtxCancel := context.WithCancel(context.Background())
 	defer rootCtxCancel()
@@ -240,6 +252,7 @@ func main() {
 		PrometheusBackend:     *flagPrometheusBackend,
 		PrometheusTimeout:     *flagPrometheusTimeout,
 		TruncationLimit:       *flagPrometheusTruncationLimit,
+		MaxResponseSize:       int64(*flagPrometheusMaxResponseSize),
 		RoundTripper:          rt,
 		TSDBAdminToolsEnabled: *flagEnableTsdbAdminTools,
 		EnabledTools:          *flagMcpTools,
