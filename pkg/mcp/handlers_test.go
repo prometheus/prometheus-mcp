@@ -21,8 +21,12 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -2722,56 +2726,118 @@ func TestGetEffectiveTruncationLimit(t *testing.T) {
 	}
 }
 
+const outputGoldenDir = "testdata/output"
+
+// TestFormatOutput pins the text a tool result carries in each output mode
+// against golden files at testdata/output/<case>.{json,toon}. The cases use
+// the client_golang response types the handlers return. Run
+// `make update-golden` to regenerate the files after changing FormatOutput
+// or an output type, and read the diff: it is what LLM clients receive.
 func TestFormatOutput(t *testing.T) {
 	t.Parallel()
-	testCases := []struct {
-		name        string
-		toonEnabled bool
-		data        any
-		validate    func(t *testing.T, result string, err error)
-	}{
+	type outputCase struct {
+		name string
+		data any
+	}
+	testCases := []outputCase{
 		{
-			name:        "JSON mode - simple map",
-			toonEnabled: false,
-			data:        map[string]string{"key": "value"},
-			validate: func(t *testing.T, result string, err error) {
-				require.NoError(t, err)
-				require.JSONEq(t, `{"key":"value"}`, result)
-			},
-		},
-		{
-			name:        "JSON mode - complex struct",
-			toonEnabled: false,
+			name: "alertmanagers",
 			data: promv1.AlertManagersResult{
-				Active: []promv1.AlertManager{{URL: "http://am:9093"}},
-			},
-			validate: func(t *testing.T, result string, err error) {
-				require.NoError(t, err)
-				require.Contains(t, result, "http://am:9093")
+				Active: []promv1.AlertManager{
+					{URL: "http://am-0:9093/api/v2/alerts"},
+					{URL: "http://am-1:9093/api/v2/alerts"},
+				},
+				Dropped: []promv1.AlertManager{},
 			},
 		},
 		{
-			name:        "TOON mode - simple map",
-			toonEnabled: true,
-			data:        map[string]string{"key": "value"},
-			validate: func(t *testing.T, result string, err error) {
-				require.NoError(t, err)
-				require.NotEmpty(t, result)
-				// Basic check that it's not JSON
-				require.NotContains(t, result, `{"key":"value"}`)
+			name: "instant_query",
+			data: model.Vector{
+				&model.Sample{
+					Metric:    model.Metric{"__name__": "up", "instance": "localhost:9090", "job": "prometheus"},
+					Value:     1,
+					Timestamp: model.Time(1700000000000),
+				},
+				&model.Sample{
+					Metric:    model.Metric{"__name__": "up", "instance": "localhost:9100", "job": "node"},
+					Value:     0,
+					Timestamp: model.Time(1700000000000),
+				},
+			},
+		},
+		{
+			name: "metric_metadata",
+			data: []promv1.MetricMetadata{
+				{
+					Target: map[string]string{"instance": "localhost:9090", "job": "prometheus"},
+					Metric: "http_requests_total",
+					Type:   promv1.MetricTypeCounter,
+					Help:   "Requests with latency <= 1s & status < 500",
+				},
+				{
+					Target: map[string]string{"instance": "localhost:9100", "job": "node"},
+					Type:   promv1.MetricTypeGauge,
+					Help:   "1 => the exporter is up, 0 => it is down",
+				},
+			},
+		},
+		{
+			name: "tsdb_stats",
+			data: promv1.TSDBResult{
+				HeadStats: promv1.TSDBHeadStats{
+					MinTime: math.MaxInt,
+					MaxTime: math.MinInt,
+				},
+				SeriesCountByMetricName: []promv1.Stat{
+					{Name: "up", Value: 2},
+					{Name: "http_requests_total", Value: 1},
+				},
+				LabelValueCountByLabelName:  []promv1.Stat{{Name: "__name__", Value: 2}},
+				MemoryInBytesByLabelName:    []promv1.Stat{},
+				SeriesCountByLabelValuePair: []promv1.Stat{{Name: "job=prometheus", Value: 2}},
 			},
 		},
 	}
+	modes := []struct {
+		ext         string
+		toonEnabled bool
+	}{
+		{ext: "json", toonEnabled: false},
+		{ext: "toon", toonEnabled: true},
+	}
+
+	if *update {
+		require.NoError(t, os.MkdirAll(outputGoldenDir, 0o755))
+	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			container := &ServerContainer{
-				toonOutputEnabled: tc.toonEnabled,
-			}
+		for _, mode := range modes {
+			t.Run(tc.name+"/"+mode.ext, func(t *testing.T) {
+				container := &ServerContainer{toonOutputEnabled: mode.toonEnabled}
+				got, err := container.FormatOutput(tc.data)
+				require.NoError(t, err)
+				// Golden files end in a newline; the result does not.
+				got += "\n"
+				path := filepath.Join(outputGoldenDir, tc.name+"."+mode.ext)
 
-			result, err := container.FormatOutput(tc.data)
-			tc.validate(t, result, err)
-		})
+				if *update {
+					require.NoError(t, os.WriteFile(path, []byte(got), 0o644))
+					return
+				}
+
+				want, err := os.ReadFile(path)
+				require.NoErrorf(t, err, "reading golden file; regenerate with `make update-golden`")
+				require.Equalf(t, string(want), got, "output differs from %s; regenerate with `make update-golden`", path)
+			})
+		}
+	}
+
+	entries, err := os.ReadDir(outputGoldenDir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		name := strings.TrimSuffix(strings.TrimSuffix(entry.Name(), ".json"), ".toon")
+		known := slices.ContainsFunc(testCases, func(tc outputCase) bool { return tc.name == name })
+		require.Truef(t, known, "%s/%s matches no test case; delete it", outputGoldenDir, entry.Name())
 	}
 }
 
