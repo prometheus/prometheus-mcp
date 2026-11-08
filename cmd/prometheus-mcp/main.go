@@ -111,6 +111,11 @@ var (
 		"Path to config file to set Prometheus HTTP client options",
 	).String()
 
+	flagWebListen = kingpin.Flag(
+		"web.listen",
+		"Enable the web listener.",
+	).Default("true").Bool()
+
 	flagWebTelemetryPath = kingpin.Flag(
 		"web.telemetry-path",
 		"Path under which to expose metrics.",
@@ -229,6 +234,12 @@ func main() {
 		transport = mcp.TransportHTTP
 	}
 
+	if !*flagWebListen && transport == mcp.TransportHTTP {
+		logger.Error("--no-web.listen cannot be used with --mcp.transport=http: the MCP endpoint is served by the web listener")
+		rootCtxCancel()
+		os.Exit(1)
+	}
+
 	if flagMcpSessionTimeoutSet || flagMcpSessionTimeoutClause.HasEnvarValue() {
 		logger.Warn("--mcp.session-timeout is deprecated and ignored: session-tracked HTTP was removed and every request is served statelessly", "value", *flagMcpSessionTimeout)
 	}
@@ -256,7 +267,6 @@ func main() {
 		rootCtxCancel()
 		os.Exit(1)
 	}
-	srv := initHTTPServer(logger, mcpContainer)
 
 	var g run.Group
 	{
@@ -280,8 +290,9 @@ func main() {
 			},
 		)
 	}
-	{
+	if *flagWebListen {
 		// web server for metrics, pprof, and HTTP if transport is configured
+		srv := initHTTPServer(logger, mcpContainer)
 		cancel := make(chan struct{})
 
 		g.Add(

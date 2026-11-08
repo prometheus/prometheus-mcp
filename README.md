@@ -217,6 +217,9 @@ The server speaks MCP over `stdio` (the default) or HTTP (`--mcp.transport=http`
 MCP protocol revisions `2024-11-05` through `2026-07-28` are supported, and the client chooses which one to use.
 Over HTTP, only the Streamable HTTP transport is served; the older HTTP+SSE transport is not.
 
+With `stdio`, the web listener is enabled by default. Set `--no-web.listen` (or `PROMETHEUS_MCP_WEB_LISTEN=false`) to disable it.
+This makes metrics, health and readiness endpoints, pprof, the landing page, and HTTP documentation unavailable; MCP documentation tools remain available.
+
 The HTTP transport is stateless: each request is handled on its own and no session is tracked, so replicas can sit behind any load balancer without session affinity.
 What follows from that:
 
@@ -340,7 +343,7 @@ These map directly onto Kubernetes liveness/readiness probes. The `prom_mcp_serv
 
 ### Metrics
 
-Once running, the server exposes Prometheus metrics on the configured listen address and telemetry path (`:8080/metrics`, by default).
+Unless `--no-web.listen` is set, the server exposes Prometheus metrics on the configured listen address and telemetry path (`:8080/metrics`, by default).
 Please see [Flags](#command-line-flags) for more information on how to change the listening interface, port, or telemetry path.
 
 <details>
@@ -523,6 +526,8 @@ Flags:
                                  ($PROMETHEUS_MCP_PROMETHEUS_TRUNCATION_LIMIT)
       --http.config=HTTP.CONFIG  Path to config file to set Prometheus HTTP
                                  client options ($PROMETHEUS_MCP_HTTP_CONFIG)
+      --[no-]web.listen          Enable the web listener.
+                                 ($PROMETHEUS_MCP_WEB_LISTEN)
       --web.telemetry-path="/metrics"  
                                  Path under which to expose metrics.
                                  ($PROMETHEUS_MCP_WEB_TELEMETRY_PATH)
