@@ -524,6 +524,14 @@ Flags:
                                  request arguments on supported tools.
                                  To disable truncation limits, set to 0.
                                  ($PROMETHEUS_MCP_PROMETHEUS_TRUNCATION_LIMIT)
+      --prometheus.max-response-size=0  
+                                 Maximum size of a single response body
+                                 from the Prometheus API, e.g. 64MiB.
+                                 A larger response fails the tool call with an
+                                 error instead of being loaded into memory.
+                                 One tool call can hold several times this size
+                                 in memory. To disable the limit, set to 0.
+                                 ($PROMETHEUS_MCP_PROMETHEUS_MAX_RESPONSE_SIZE)
       --http.config=HTTP.CONFIG  Path to config file to set Prometheus HTTP
                                  client options ($PROMETHEUS_MCP_HTTP_CONFIG)
       --[no-]web.listen          Enable the web listener.
