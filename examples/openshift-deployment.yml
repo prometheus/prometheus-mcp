@@ -37,7 +37,7 @@ spec:
       serviceAccountName: prometheus-mcp
       containers:
         - name: prometheus-mcp
-          image: ghcr.io/tjhop/prometheus-mcp-server:latest
+          image: prom/prometheus-mcp:latest
           args:
             - '--prometheus.url=https://thanos-querier.openshift-monitoring.svc:9091'
             - '--http.config=/etc/configs/prom-config.yaml'
