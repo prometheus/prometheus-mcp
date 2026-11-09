@@ -2590,7 +2590,7 @@
                 "type": "prometheus",
                 "uid": "$datasource"
               },
-              "expr": "prom_mcp_docs_last_update_timestamp_seconds{job=~\"$job\", instance=~\"$instance\"}",
+              "expr": "prom_mcp_docs_last_update_timestamp_seconds{job=~\"$job\", instance=~\"$instance\"} * 1000",
               "legendFormat": "{{ instance }}",
               "refId": "A"
             }
