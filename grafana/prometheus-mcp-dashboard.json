@@ -2581,7 +2581,7 @@
               "values": false
             },
             "showPercentChange": false,
-            "textMode": "value",
+            "textMode": "auto",
             "wideLayout": true
           },
           "targets": [
