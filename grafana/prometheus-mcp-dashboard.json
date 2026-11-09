@@ -2051,7 +2051,7 @@
                   "mode": "off"
                 }
               },
-              "noValue": "No resource reads",
+              "noValue": "No prompt requests",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
