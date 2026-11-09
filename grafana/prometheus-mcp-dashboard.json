@@ -613,7 +613,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "topk(10, sum by (tool_name) (histogram_count(increase(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__range]))) or sum by (tool_name) (increase(prom_mcp_tool_call_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[$__range])))",
+          "expr": "topk(10, (sum by (tool_name) (histogram_count(increase(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__range]))) or sum by (tool_name) (increase(prom_mcp_tool_call_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[$__range]))) > 0)",
           "instant": true,
           "legendFormat": "{{ tool_name }}",
           "refId": "A"
