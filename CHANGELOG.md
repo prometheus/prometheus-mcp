@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-* [ENHANCEMENT] mcp: apply the global and per-call truncation limits to `list_alerts`, keeping complete alert entries.
+* [ENHANCEMENT] mcp: `list_alerts` sorts alerts (firing before pending, each by labels) and applies the global and per-call truncation limits, keeping complete alert entries.
 
 ## 0.19.0-rc.0 / 2026-11-01
 

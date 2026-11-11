@@ -14,6 +14,7 @@
 package mcp
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,6 +23,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -120,14 +122,24 @@ func truncateStringByLines(s string, limit int) (string, bool) {
 const (
 	truncationWarningTemplate = "\n\n" +
 		"Warning: The result was truncated because the Prometheus MCP server was started with the flag '--prometheus.truncation-limit=%d'.\n" +
-		"You may want to try optimizing your query by refining label filters or using aggregation functions to group results, where possible.\n" +
+		"%s" +
 		"If needed, several tools support a 'truncation_limit'/'limit' argument that can override the global truncation limit on a per-tool-call basis.\n" +
 		"This includes the ability to disable truncation on a tool call by setting the truncation limit to -1."
+
+	// queryTruncationHint is the truncation hint for tools whose results can
+	// be narrowed with label filters or aggregation.
+	queryTruncationHint = "You may want to try optimizing your query by refining label filters or using aggregation functions to group results, where possible.\n"
+
+	// alertsTruncationHint is the truncation hint for the list alerts tool.
+	// The alerts endpoint takes no filters, so it explains which alerts were
+	// kept instead.
+	alertsTruncationHint = "Alerts are sorted with firing alerts before pending alerts, each ordered by their labels, so the alerts at the end of that order were dropped.\n"
 )
 
-// displayTruncationWarning returns a warning message for truncated results.
-func displayTruncationWarning(limit int) string {
-	return fmt.Sprintf(truncationWarningTemplate, limit)
+// displayTruncationWarning returns a warning message for truncated results,
+// with a tool-specific hint.
+func displayTruncationWarning(limit int, hint string) string {
+	return fmt.Sprintf(truncationWarningTemplate, limit, hint)
 }
 
 // parseTimeWithDefault parses a time string using ParseTimestampOrDuration.
@@ -337,10 +349,13 @@ func (s *ServerContainer) FlagsHandler(ctx context.Context, req *mcp.CallToolReq
 }
 
 // ListAlertsHandler handles the list alerts tool.
-func (s *ServerContainer) ListAlertsHandler(ctx context.Context, req *mcp.CallToolRequest, input TruncatableInput) (*mcp.CallToolResult, any, error) {
-	return callAPIAndReturnToolResult(ctx, func(ctx context.Context) (string, error) {
-		return s.listAlertsAPICall(ctx, s.GetEffectiveTruncationLimit(input.TruncationLimit))
-	}, "failed making list alerts api call: ")
+func (s *ServerContainer) ListAlertsHandler(ctx context.Context, req *mcp.CallToolRequest, input ListAlertsInput) (*mcp.CallToolResult, any, error) {
+	truncationLimit := s.GetEffectiveTruncationLimit(input.TruncationLimit)
+	result, err := s.listAlertsAPICall(ctx, truncationLimit)
+	if err != nil {
+		return newToolErrorResult("failed making list alerts api call: " + err.Error()), nil, nil
+	}
+	return newToolTextResult(result), nil, nil
 }
 
 // TsdbStatsHandler handles the TSDB stats tool.
@@ -665,7 +680,7 @@ func (s *ServerContainer) ThanosStoresHandler(ctx context.Context, req *mcp.Call
 func (s *ServerContainer) formatTruncatedQueryAPIResponse(resultString string, warnings promv1.Warnings, truncationLimit int) (string, error) {
 	truncatedResult, truncated := truncateStringByLines(resultString, truncationLimit)
 	if truncated {
-		resultString = truncatedResult + displayTruncationWarning(truncationLimit)
+		resultString = truncatedResult + displayTruncationWarning(truncationLimit, queryTruncationHint)
 	}
 	return s.FormatOutput(queryAPIResponse{
 		Result:   resultString,
@@ -847,7 +862,7 @@ func (s *ServerContainer) metricMetadataAPICall(ctx context.Context, metric, lim
 	// A full response means Prometheus hit `limit`. The API gives no "more
 	// available" signal, so an exact fit warns too.
 	if metric == "" && limitInt > 0 && len(mm) >= limitInt {
-		encodedData += displayTruncationWarning(limitInt)
+		encodedData += displayTruncationWarning(limitInt, queryTruncationHint)
 	}
 
 	return encodedData, nil
@@ -899,7 +914,7 @@ func (s *ServerContainer) targetsMetadataAPICall(ctx context.Context, matchTarge
 	}
 
 	if limitInt > 0 && len(tm) >= limitInt {
-		encodedData += displayTruncationWarning(limitInt)
+		encodedData += displayTruncationWarning(limitInt, queryTruncationHint)
 	}
 
 	return encodedData, nil
@@ -938,27 +953,73 @@ func (s *ServerContainer) flagsAPICall(ctx context.Context) (string, error) {
 		})
 }
 
+// alertStateRank orders alert states for sorting: firing, then pending, then
+// anything else.
+func alertStateRank(state promv1.AlertState) int {
+	switch state {
+	case promv1.AlertStateFiring:
+		return 0
+	case promv1.AlertStatePending:
+		return 1
+	default:
+		return 2
+	}
+}
+
+// sortAlerts sorts alerts in place, firing before pending, each group ordered
+// by labelset. Prometheus returns alerts in no fixed order, so this keeps
+// truncated results stable across calls.
+func sortAlerts(alerts []promv1.Alert) {
+	slices.SortFunc(alerts, func(a, b promv1.Alert) int {
+		if c := cmp.Compare(alertStateRank(a.State), alertStateRank(b.State)); c != 0 {
+			return c
+		}
+		if a.Labels.Before(b.Labels) {
+			return -1
+		}
+		if b.Labels.Before(a.Labels) {
+			return 1
+		}
+		// Equal labelsets can come from different rules, so break ties
+		// on the remaining fields.
+		if c := a.ActiveAt.Compare(b.ActiveAt); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Value, b.Value)
+	})
+}
+
 func (s *ServerContainer) listAlertsAPICall(ctx context.Context, truncationLimit int) (string, error) {
-	truncated := false
-	result, err := s.doSimpleAPICall(ctx, "/api/v1/alerts", "failed to get alerts from Prometheus",
-		func(ctx context.Context, client promv1.API) (any, error) {
-			alerts, err := client.Alerts(ctx)
-			if err != nil {
-				return nil, err
-			}
-			if truncationLimit > 0 && len(alerts.Alerts) > truncationLimit {
-				alerts.Alerts = alerts.Alerts[:truncationLimit]
-				truncated = true
-			}
-			return alerts, nil
-		})
+	client, _ := s.GetAPIClient(ctx)
+	ctx, cancel := context.WithTimeout(ctx, s.apiTimeout)
+	defer cancel()
+
+	path := "/api/v1/alerts"
+	startTs := time.Now()
+	result, err := client.Alerts(ctx)
+	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
-		return "", err
+		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
+		return "", fmt.Errorf("failed to get alerts from Prometheus: %w", wrapErrorIfNotFound(err, path))
 	}
+
+	sortAlerts(result.Alerts)
+
+	truncated := truncationLimit > 0 && len(result.Alerts) > truncationLimit
 	if truncated {
-		result += displayTruncationWarning(truncationLimit)
+		result.Alerts = result.Alerts[:truncationLimit]
 	}
-	return result, nil
+
+	encodedData, err := s.FormatOutput(result)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode alerts: %w", err)
+	}
+
+	if truncated {
+		encodedData += displayTruncationWarning(truncationLimit, alertsTruncationHint)
+	}
+
+	return encodedData, nil
 }
 
 func (s *ServerContainer) tsdbStatsAPICall(ctx context.Context) (string, error) {
