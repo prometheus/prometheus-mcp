@@ -130,6 +130,16 @@ func displayTruncationWarning(limit int) string {
 	return fmt.Sprintf(truncationWarningTemplate, limit)
 }
 
+// apiLimit converts a truncation limit to the API limit parameter. 0 sends
+// none. The extra entry lets a result the backend cut still read as truncated
+// (math.MaxInt has no room for it).
+func apiLimit(truncationLimit int) uint64 {
+	if truncationLimit <= 0 || truncationLimit == math.MaxInt {
+		return 0
+	}
+	return uint64(truncationLimit) + 1
+}
+
 // parseTimeWithDefault parses a time string using ParseTimestampOrDuration.
 // If the input is empty, it returns defaultVal. This consolidates the repeated
 // optional time parsing pattern used across multiple handlers.
@@ -678,7 +688,7 @@ func (s *ServerContainer) queryAPICall(ctx context.Context, query string, ts tim
 
 	path := "/api/v1/query"
 	startTs := time.Now()
-	result, warnings, _, err := client.Query(ctx, query, ts)
+	result, warnings, _, err := client.Query(ctx, query, ts, promv1.WithLimit(apiLimit(truncationLimit)))
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -695,7 +705,7 @@ func (s *ServerContainer) rangeQueryAPICall(ctx context.Context, query string, s
 
 	path := "/api/v1/query_range"
 	startTs := time.Now()
-	result, warnings, _, err := client.QueryRange(ctx, query, promv1.Range{Start: start, End: end, Step: step})
+	result, warnings, _, err := client.QueryRange(ctx, query, promv1.Range{Start: start, End: end, Step: step}, promv1.WithLimit(apiLimit(truncationLimit)))
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -738,7 +748,7 @@ func (s *ServerContainer) seriesAPICall(ctx context.Context, matches []string, s
 
 	path := "/api/v1/series"
 	startTs := time.Now()
-	result, warnings, _, err := client.Series(ctx, matches, start, end)
+	result, warnings, _, err := client.Series(ctx, matches, start, end, promv1.WithLimit(apiLimit(truncationLimit)))
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -760,7 +770,7 @@ func (s *ServerContainer) labelNamesAPICall(ctx context.Context, matches []strin
 
 	path := "/api/v1/labels"
 	startTs := time.Now()
-	result, warnings, _, err := client.LabelNames(ctx, matches, start, end)
+	result, warnings, _, err := client.LabelNames(ctx, matches, start, end, promv1.WithLimit(apiLimit(truncationLimit)))
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
@@ -782,7 +792,7 @@ func (s *ServerContainer) labelValuesAPICall(ctx context.Context, label string, 
 
 	path := "/api/v1/label/:name/values"
 	startTs := time.Now()
-	result, warnings, _, err := client.LabelValues(ctx, label, matches, start, end)
+	result, warnings, _, err := client.LabelValues(ctx, label, matches, start, end, promv1.WithLimit(apiLimit(truncationLimit)))
 	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
 	if err != nil {
 		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
