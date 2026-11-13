@@ -1,5 +1,33 @@
 {
   "additionalProperties": false,
-  "properties": {},
+  "properties": {
+    "health": {
+      "description": "only return rules with this evaluation health: ok, err or unknown",
+      "type": "string"
+    },
+    "matches": {
+      "description": "label selectors; only return rules whose labels match at least one of them",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "rule_group": {
+      "description": "only return rules from the rule group with exactly this name",
+      "type": "string"
+    },
+    "rule_name": {
+      "description": "only return rules with exactly this name",
+      "type": "string"
+    },
+    "state": {
+      "description": "only return alerting rules in this state: firing, pending or inactive (recording rules are omitted)",
+      "type": "string"
+    },
+    "type": {
+      "description": "only return rules of this type: alerting or recording",
+      "type": "string"
+    }
+  },
   "type": "object"
 }

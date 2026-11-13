@@ -1141,6 +1141,38 @@ func TestTargetsMetadataHandler(t *testing.T) {
 	}
 }
 
+func filterTestRules() promv1.RulesResult {
+	return promv1.RulesResult{Groups: []promv1.RuleGroup{
+		{
+			Name: "alerts",
+			File: "/etc/prometheus/alerts.yml",
+			Rules: promv1.Rules{
+				promv1.AlertingRule{Name: "HighErrorRate", State: "firing", Health: promv1.RuleHealthGood},
+				promv1.AlertingRule{Name: "InstanceDown", State: "inactive", Health: promv1.RuleHealthGood},
+				promv1.RecordingRule{Name: "job:http_requests:rate5m", Health: promv1.RuleHealthGood},
+			},
+		},
+		{
+			Name:  "idle_group",
+			File:  "/etc/prometheus/idle.yml",
+			Rules: promv1.Rules{promv1.RecordingRule{Name: "idle:rule", Health: promv1.RuleHealthBad}},
+		},
+	}}
+}
+
+func filterTestTargets() promv1.TargetsResult {
+	return promv1.TargetsResult{
+		Active: []promv1.ActiveTarget{
+			{ScrapePool: "node", ScrapeURL: "http://node-up:9100/metrics", Health: promv1.HealthGood},
+			{ScrapePool: "node", ScrapeURL: "http://node-down:9100/metrics", Health: promv1.HealthBad},
+			{ScrapePool: "prometheus", ScrapeURL: "http://prom-down:9090/metrics", Health: promv1.HealthBad},
+		},
+		Dropped: []promv1.DroppedTarget{
+			{DiscoveredLabels: map[string]string{"__address__": "dropped-host:80"}},
+		},
+	}
+}
+
 func TestListTargetsHandler(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -1171,6 +1203,47 @@ func TestListTargetsHandler(t *testing.T) {
 				require.False(t, isError)
 				require.Contains(t, result, "prometheus")
 				require.Contains(t, result, "localhost:9090")
+			},
+		},
+		{
+			name: "health and scrape pool filters keep only matching active targets",
+			args: map[string]any{"health": "down", "scrape_pool": "node"},
+			mockTargetsFunc: func(ctx context.Context) (promv1.TargetsResult, error) {
+				return filterTestTargets(), nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "node-down:9100")
+				require.NotContains(t, result, "node-up:9100")
+				require.NotContains(t, result, "prom-down:9090")
+				require.NotContains(t, result, "dropped-host:80")
+			},
+		},
+		{
+			name: "state dropped omits active targets",
+			args: map[string]any{"state": "dropped"},
+			mockTargetsFunc: func(ctx context.Context) (promv1.TargetsResult, error) {
+				return filterTestTargets(), nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "dropped-host:80")
+				require.NotContains(t, result, "node-up:9100")
+			},
+		},
+		{
+			name: "invalid health is rejected",
+			args: map[string]any{"health": "sideways"},
+			mockTargetsFunc: func(ctx context.Context) (promv1.TargetsResult, error) {
+				t.Fatal("API must not be called for invalid input")
+				return promv1.TargetsResult{}, nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.True(t, isError)
+				require.Contains(t, result, `invalid health "sideways"`)
 			},
 		},
 		{
@@ -1236,6 +1309,51 @@ func TestListRulesHandler(t *testing.T) {
 				require.NoError(t, err)
 				require.False(t, isError)
 				require.Contains(t, result, "example")
+			},
+		},
+		{
+			name: "filters narrow the rules and pass matches upstream",
+			args: map[string]any{
+				"type":    "alerting",
+				"state":   "firing",
+				"matches": []string{`{severity="page"}`},
+			},
+			mockRulesFunc: func(ctx context.Context, matches []string) (promv1.RulesResult, error) {
+				require.Equal(t, []string{`{severity="page"}`}, matches)
+				return filterTestRules(), nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "HighErrorRate")
+				require.NotContains(t, result, "InstanceDown")
+				require.NotContains(t, result, "job:http_requests:rate5m")
+				require.NotContains(t, result, "idle_group")
+			},
+		},
+		{
+			name: "filter matching nothing returns no groups",
+			args: map[string]any{"rule_name": "DoesNotExist"},
+			mockRulesFunc: func(ctx context.Context, matches []string) (promv1.RulesResult, error) {
+				return filterTestRules(), nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, `"groups":[]`)
+			},
+		},
+		{
+			name: "invalid state is rejected",
+			args: map[string]any{"state": "burning"},
+			mockRulesFunc: func(ctx context.Context, matches []string) (promv1.RulesResult, error) {
+				t.Fatal("API must not be called for invalid input")
+				return promv1.RulesResult{}, nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.True(t, isError)
+				require.Contains(t, result, `invalid state "burning"`)
 			},
 		},
 		{
