@@ -166,6 +166,46 @@ func (tmi TargetsMetadataInput) LogValue() slog.Value {
 	)
 }
 
+// ListRulesInput is the input for the list rules tool. All fields are
+// optional filters; a rule must satisfy every filter that is set.
+type ListRulesInput struct {
+	Type      string   `json:"type,omitempty" jsonschema:"only return rules of this type: alerting or recording"`
+	State     string   `json:"state,omitempty" jsonschema:"only return alerting rules in this state: firing, pending or inactive (recording rules are omitted)"`
+	Health    string   `json:"health,omitempty" jsonschema:"only return rules with this evaluation health: ok, err or unknown"`
+	RuleName  string   `json:"rule_name,omitempty" jsonschema:"only return rules with exactly this name"`
+	RuleGroup string   `json:"rule_group,omitempty" jsonschema:"only return rules from the rule group with exactly this name"`
+	Matches   []string `json:"matches,omitempty" jsonschema:"label selectors; only return rules whose labels match at least one of them"`
+}
+
+// LogValue implements slog.LogValuer.
+func (lri ListRulesInput) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("type", lri.Type),
+		slog.String("state", lri.State),
+		slog.String("health", lri.Health),
+		slog.String("rule_name", lri.RuleName),
+		slog.String("rule_group", lri.RuleGroup),
+		slog.Any("matches", lri.Matches),
+	)
+}
+
+// ListTargetsInput is the input for the list targets tool. All fields are
+// optional filters.
+type ListTargetsInput struct {
+	State      string `json:"state,omitempty" jsonschema:"which targets to return: active, dropped or any (default any)"`
+	Health     string `json:"health,omitempty" jsonschema:"only return active targets with this scrape health: up, down or unknown (dropped targets are omitted)"`
+	ScrapePool string `json:"scrape_pool,omitempty" jsonschema:"only return active targets from the scrape pool with exactly this name (dropped targets are omitted)"`
+}
+
+// LogValue implements slog.LogValuer.
+func (lti ListTargetsInput) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("state", lti.State),
+		slog.String("health", lti.Health),
+		slog.String("scrape_pool", lti.ScrapePool),
+	)
+}
+
 // DeleteSeriesInput is the input for the delete series admin tool.
 type DeleteSeriesInput struct {
 	Matches []string `json:"matches" jsonschema:"series selector arguments for series to delete,required"`

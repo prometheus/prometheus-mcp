@@ -362,13 +362,27 @@ func (s *ServerContainer) RuntimeInfoHandler(ctx context.Context, req *mcp.CallT
 }
 
 // ListRulesHandler handles the list rules tool.
-func (s *ServerContainer) ListRulesHandler(ctx context.Context, req *mcp.CallToolRequest, input EmptyInput) (*mcp.CallToolResult, any, error) {
-	return callAPIAndReturnToolResult(ctx, s.rulesAPICall, "failed making rules api call: ")
+func (s *ServerContainer) ListRulesHandler(ctx context.Context, req *mcp.CallToolRequest, input ListRulesInput) (*mcp.CallToolResult, any, error) {
+	if err := input.validate(); err != nil {
+		return newToolErrorResult(err.Error()), nil, nil
+	}
+	result, err := s.rulesAPICall(ctx, input)
+	if err != nil {
+		return newToolErrorResult("failed making rules api call: " + err.Error()), nil, nil
+	}
+	return newToolTextResult(result), nil, nil
 }
 
 // ListTargetsHandler handles the list targets tool.
-func (s *ServerContainer) ListTargetsHandler(ctx context.Context, req *mcp.CallToolRequest, input EmptyInput) (*mcp.CallToolResult, any, error) {
-	return callAPIAndReturnToolResult(ctx, s.targetsAPICall, "failed making targets api call: ")
+func (s *ServerContainer) ListTargetsHandler(ctx context.Context, req *mcp.CallToolRequest, input ListTargetsInput) (*mcp.CallToolResult, any, error) {
+	if err := input.validate(); err != nil {
+		return newToolErrorResult(err.Error()), nil, nil
+	}
+	result, err := s.targetsAPICall(ctx, input)
+	if err != nil {
+		return newToolErrorResult("failed making targets api call: " + err.Error()), nil, nil
+	}
+	return newToolTextResult(result), nil, nil
 }
 
 // WALReplayHandler handles the WAL replay status tool.
@@ -971,17 +985,25 @@ func (s *ServerContainer) runtimeinfoAPICall(ctx context.Context) (string, error
 		})
 }
 
-func (s *ServerContainer) rulesAPICall(ctx context.Context) (string, error) {
+func (s *ServerContainer) rulesAPICall(ctx context.Context, input ListRulesInput) (string, error) {
 	return s.doSimpleAPICall(ctx, "/api/v1/rules", "failed to get rules from Prometheus",
 		func(ctx context.Context, client promv1.API) (any, error) {
-			return client.Rules(ctx, nil)
+			res, err := client.Rules(ctx, input.Matches)
+			if err != nil {
+				return nil, err
+			}
+			return input.filter(res), nil
 		})
 }
 
-func (s *ServerContainer) targetsAPICall(ctx context.Context) (string, error) {
+func (s *ServerContainer) targetsAPICall(ctx context.Context, input ListTargetsInput) (string, error) {
 	return s.doSimpleAPICall(ctx, "/api/v1/targets", "failed to get targets from Prometheus",
 		func(ctx context.Context, client promv1.API) (any, error) {
-			return client.Targets(ctx)
+			res, err := client.Targets(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return input.filter(res), nil
 		})
 }
 

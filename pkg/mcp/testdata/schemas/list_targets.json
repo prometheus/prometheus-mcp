@@ -1,5 +1,18 @@
 {
   "additionalProperties": false,
-  "properties": {},
+  "properties": {
+    "health": {
+      "description": "only return active targets with this scrape health: up, down or unknown (dropped targets are omitted)",
+      "type": "string"
+    },
+    "scrape_pool": {
+      "description": "only return active targets from the scrape pool with exactly this name (dropped targets are omitted)",
+      "type": "string"
+    },
+    "state": {
+      "description": "which targets to return: active, dropped or any (default any)",
+      "type": "string"
+    }
+  },
   "type": "object"
 }
