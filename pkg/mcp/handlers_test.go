@@ -21,6 +21,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -36,6 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/prometheus-mcp/pkg/mcp/mcptest"
+	mcpProm "github.com/prometheus/prometheus-mcp/pkg/prometheus"
 )
 
 // newTestContainer creates a ServerContainer with sensible defaults for testing.
@@ -2718,6 +2720,76 @@ func TestGetEffectiveTruncationLimit(t *testing.T) {
 
 			result := container.GetEffectiveTruncationLimit(tc.perCallLimit)
 			require.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+// TestAPILimit runs a real client over a mock RoundTripper because the mock
+// API cannot see promv1 options. Only the request matters, so the round trip
+// fails once it is captured.
+func TestAPILimit(t *testing.T) {
+	t.Parallel()
+
+	var gotLimit string
+	client, err := mcpProm.NewAPIClient("http://localhost:9090", &mockRoundTripper{
+		RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+			gotLimit = req.FormValue("limit")
+			return nil, errors.New("request captured")
+		},
+	})
+	require.NoError(t, err)
+	container := newTestContainer(nil)
+	container.defaultAPIClient = client
+
+	ctx := context.Background()
+	start := time.Unix(1700000000, 0)
+	end := start.Add(time.Hour)
+
+	testCases := []struct {
+		name     string
+		call     func() (string, error)
+		expected string
+	}{
+		{
+			name:     "query",
+			call:     func() (string, error) { return container.queryAPICall(ctx, "up", start, 7) },
+			expected: "8",
+		},
+		{
+			name: "truncation disabled sends no limit",
+			call: func() (string, error) { return container.queryAPICall(ctx, "up", start, 0) },
+		},
+		{
+			name: "no room for the extra entry sends no limit",
+			call: func() (string, error) { return container.queryAPICall(ctx, "up", start, math.MaxInt) },
+		},
+		{
+			name:     "range_query",
+			call:     func() (string, error) { return container.rangeQueryAPICall(ctx, "up", start, end, time.Minute, 7) },
+			expected: "8",
+		},
+		{
+			name:     "series",
+			call:     func() (string, error) { return container.seriesAPICall(ctx, []string{"up"}, start, end, 7) },
+			expected: "8",
+		},
+		{
+			name:     "label_names",
+			call:     func() (string, error) { return container.labelNamesAPICall(ctx, nil, start, end, 7) },
+			expected: "8",
+		},
+		{
+			name:     "label_values",
+			call:     func() (string, error) { return container.labelValuesAPICall(ctx, "job", nil, start, end, 7) },
+			expected: "8",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.call()
+			require.ErrorContains(t, err, "request captured")
+			require.Equal(t, tc.expected, gotLimit)
 		})
 	}
 }

@@ -102,6 +102,7 @@ var (
 	flagPrometheusTruncationLimit = kingpin.Flag(
 		"prometheus.truncation-limit",
 		"If enabled, this controls the maximum query response size in number of lines/entries provided to the LLM from the API response."+
+			" The limit is also sent to the backend as the API 'limit' parameter; backends that ignore it are truncated after the response is read."+
 			" LLMs can override truncation limits if needed on a per-tool-call basis via tool request arguments on supported tools."+
 			" To disable truncation limits, set to 0.",
 	).Default("0").Int()
