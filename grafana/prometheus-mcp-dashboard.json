@@ -2591,7 +2591,9 @@
                 "uid": "$datasource"
               },
               "expr": "prom_mcp_docs_last_update_timestamp_seconds{job=~\"$job\", instance=~\"$instance\"} * 1000",
+              "instant": true,
               "legendFormat": "{{ instance }}",
+              "range": false,
               "refId": "A"
             }
           ],
