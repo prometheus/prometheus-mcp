@@ -2700,16 +2700,17 @@
   ],
   "links": [
     {
-      "title": "Kubernetes workload",
-      "type": "link",
-      "url": "/d/a164a7f0339f99e89cea5cb47e9be617/kubernetes-compute-resources-workload?var-type=deployment",
-      "tooltip": "CPU, memory and throttling against the Deployment's limits (kubernetes-mixin dashboard shipped by kube-prometheus-stack)",
+      "title": "Kubernetes",
+      "type": "dashboards",
+      "tooltip": "",
       "icon": "external link",
-      "asDropdown": false,
+      "asDropdown": true,
       "includeVars": false,
       "keepTime": true,
-      "targetBlank": false,
-      "tags": []
+      "targetBlank": true,
+      "tags": [
+        "kubernetes-mixin"
+      ]
     }
   ],
   "templating": {
