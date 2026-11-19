@@ -2752,7 +2752,7 @@
           "query": "label_values(prom_mcp_build_info, job)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -2782,7 +2782,7 @@
           "query": "label_values(prom_mcp_build_info{job=~\"$job\"}, instance)",
           "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
