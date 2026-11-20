@@ -437,7 +437,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "(histogram_quantile(0.99, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__range]))) or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__range])))) > 0",
+          "expr": "(histogram_quantile(0.99, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__range]))) > 0 or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__range])))) > 0",
           "instant": true,
           "legendFormat": "p99",
           "range": false,
@@ -446,7 +446,7 @@
       ],
       "title": "Tool Latency (p99)",
       "type": "stat",
-      "description": "99th percentile of tool-call duration across the selected instances over the selected time range. Includes the time spent waiting on Prometheus."
+      "description": "99th percentile of tool-call duration across the selected instances over the selected time range. Includes the time spent waiting on Prometheus. If the selected targets mix native and classic histograms, percentiles come from the native ones while they have traffic, and from the classic ones otherwise."
     },
     {
       "id": 6,
@@ -709,7 +709,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "refId": "A"
         },
@@ -718,7 +718,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "histogram_quantile(0.90, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.90, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.90, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.90, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p90",
           "refId": "B"
         },
@@ -727,13 +727,14 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "refId": "C"
         }
       ],
       "title": "Tool Call Latency (p50 / p90 / p99)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "If the selected targets mix native and classic histograms, percentiles come from the native ones while they have traffic, and from the classic ones otherwise."
     },
     {
       "datasource": {
@@ -951,7 +952,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "tool p50",
           "range": true,
           "refId": "A"
@@ -962,7 +963,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_tool_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "tool p99",
           "range": true,
           "refId": "B"
@@ -973,7 +974,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "backend p50",
           "range": true,
           "refId": "C"
@@ -984,7 +985,7 @@
             "uid": "$datasource"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "backend p99",
           "range": true,
           "refId": "D"
@@ -992,7 +993,7 @@
       ],
       "title": "Tool vs Backend Latency (p50 / p99)",
       "type": "timeseries",
-      "description": "Tool-call latency against the Prometheus API calls made on its behalf. The gap is a rough guide to the server's own cost (decode, truncation, serialisation), not a measurement. A tool call may issue several API calls, and the docs and runbook tools issue none."
+      "description": "Tool-call latency against the Prometheus API calls made on its behalf. The gap is a rough guide to the server's own cost (decode, truncation, serialisation), not a measurement. A tool call may issue several API calls, and the docs and runbook tools issue none. If the selected targets mix native and classic histograms, percentiles come from the native ones while they have traffic, and from the classic ones otherwise."
     },
     {
       "datasource": {
@@ -1176,7 +1177,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.50, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p50",
           "refId": "A"
         },
@@ -1185,7 +1186,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "histogram_quantile(0.90, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.90, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.90, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.90, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p90",
           "refId": "B"
         },
@@ -1194,13 +1195,14 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum(rate(prom_mcp_api_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.99, sum by (le) (rate(prom_mcp_api_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
           "legendFormat": "p99",
           "refId": "C"
         }
       ],
       "title": "API Latency (p50 / p90 / p99)",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "If the selected targets mix native and classic histograms, percentiles come from the native ones while they have traffic, and from the classic ones otherwise."
     },
     {
       "datasource": {
@@ -2096,7 +2098,7 @@
                 "type": "prometheus",
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.90, sum by (prompt_name) (rate(prom_mcp_prompt_get_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.90, sum by (le, prompt_name) (rate(prom_mcp_prompt_get_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+              "expr": "histogram_quantile(0.90, sum by (prompt_name) (rate(prom_mcp_prompt_get_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.90, sum by (le, prompt_name) (rate(prom_mcp_prompt_get_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
               "legendFormat": "{{ prompt_name }}",
               "refId": "A"
             },
@@ -2105,13 +2107,14 @@
                 "type": "prometheus",
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.90, sum(rate(prom_mcp_prompt_list_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.90, sum by (le) (rate(prom_mcp_prompt_list_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+              "expr": "histogram_quantile(0.90, sum(rate(prom_mcp_prompt_list_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.90, sum by (le) (rate(prom_mcp_prompt_list_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
               "legendFormat": "prompts/list",
               "refId": "B"
             }
           ],
           "title": "Prompt Latency (p90)",
-          "type": "timeseries"
+          "type": "timeseries",
+          "description": "If the selected targets mix native and classic histograms, percentiles come from the native ones while they have traffic, and from the classic ones otherwise."
         },
         {
           "datasource": {
@@ -2413,13 +2416,14 @@
                 "type": "prometheus",
                 "uid": "$datasource"
               },
-              "expr": "histogram_quantile(0.90, sum by (resource_uri) (rate(prom_mcp_resource_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) or histogram_quantile(0.90, sum by (le, resource_uri) (rate(prom_mcp_resource_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
+              "expr": "histogram_quantile(0.90, sum by (resource_uri) (rate(prom_mcp_resource_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))) > 0 or histogram_quantile(0.90, sum by (le, resource_uri) (rate(prom_mcp_resource_call_duration_seconds_bucket{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])))",
               "legendFormat": "{{ resource_uri }}",
               "refId": "A"
             }
           ],
           "title": "Resource Latency (p90)",
-          "type": "timeseries"
+          "type": "timeseries",
+          "description": "If the selected targets mix native and classic histograms, percentiles come from the native ones while they have traffic, and from the classic ones otherwise."
         },
         {
           "datasource": {
