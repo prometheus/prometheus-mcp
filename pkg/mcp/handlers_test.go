@@ -1552,16 +1552,70 @@ func TestListAlertsHandler(t *testing.T) {
 			},
 		},
 		{
-			name:           "sorts firing before pending, each by labels",
-			args:           map[string]any{},
-			mockAlertsFunc: unsortedAlerts,
+			name: "sorts firing before pending, each by labels",
+			args: map[string]any{},
+			mockAlertsFunc: func(ctx context.Context) (promv1.AlertsResult, error) {
+				early := time.Date(2026, 11, 19, 10, 0, 0, 0, time.UTC)
+				late := early.Add(time.Minute)
+				// Each alert's summary marks it in the output. Alerts that only
+				// differ in a later field share labels.
+				alert := func(state promv1.AlertState, labels model.LabelSet, activeAt time.Time, value, summary string) promv1.Alert {
+					return promv1.Alert{
+						Labels:      labels,
+						Annotations: model.LabelSet{"summary": model.LabelValue(summary)},
+						State:       state,
+						ActiveAt:    activeAt,
+						Value:       value,
+					}
+				}
+				down := model.LabelSet{"alertname": "InstanceDown", "instance": "b"}
+				return promv1.AlertsResult{
+					Alerts: []promv1.Alert{
+						alert("unknown", model.LabelSet{"alertname": "Stale"}, early, "1", "m-unknown-state"),
+						alert(promv1.AlertStatePending, model.LabelSet{"alertname": "HighCPUUsage"}, early, "1", "m-pending-cpu"),
+						alert(promv1.AlertStateFiring, down, early, "2", "m-down-value-2"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "Watchdog"}, early, "1", "m-watchdog"),
+						alert(promv1.AlertStateFiring, down, late, "1", "m-down-late"),
+						alert(promv1.AlertStateInactive, model.LabelSet{"alertname": "Stale"}, early, "1", "m-inactive-state"),
+						alert(promv1.AlertStateFiring, down, early, "1", "m-down-value-1-z"),
+						alert(promv1.AlertStateFiring, down, early, "1", "m-down-value-1-a"),
+						alert(promv1.AlertStatePending, model.LabelSet{"alertname": "CacheMiss"}, early, "1", "m-pending-cache"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "DiskFull", "instance": "a"}, early, "1", "m-disk-instance"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "DiskFull", "job": "node"}, early, "1", "m-disk-job"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "DiskFull"}, early, "1", "m-disk"),
+					},
+				}, nil
+			},
 			validateResult: func(t *testing.T, result string, isError bool, err error) {
 				require.NoError(t, err)
 				require.False(t, isError)
-				diskFull := strings.Index(result, "DiskFull")
-				instanceDown := strings.Index(result, "InstanceDown")
-				highCPU := strings.Index(result, "HighCPUUsage")
-				require.True(t, diskFull >= 0 && diskFull < instanceDown && instanceDown < highCPU, "unexpected alert order: %s", result)
+				want := []string{
+					// Firing, by labels in name order, comparing names then
+					// values. A labelset that is a prefix of another comes
+					// first, and a single-label Watchdog sorts by its value,
+					// not its label count.
+					"m-disk",
+					"m-disk-instance",
+					"m-disk-job",
+					// Same labels: earlier ActiveAt, then lower value, then annotations.
+					"m-down-value-1-a",
+					"m-down-value-1-z",
+					"m-down-value-2",
+					"m-down-late",
+					"m-watchdog",
+					// Pending, by labels.
+					"m-pending-cache",
+					"m-pending-cpu",
+					// Other states, by state when the labels match.
+					"m-inactive-state",
+					"m-unknown-state",
+				}
+				last := -1
+				for _, marker := range want {
+					i := strings.Index(result, `"`+marker+`"`)
+					require.Greater(t, i, last, "%s is out of order: %s", marker, result)
+					last = i
+				}
 				require.NotContains(t, result, "truncated")
 			},
 		},

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"net/url"
@@ -966,26 +967,46 @@ func alertStateRank(state promv1.AlertState) int {
 	}
 }
 
-// sortAlerts sorts alerts in place, firing before pending, each group ordered
-// by labelset. Prometheus returns alerts in no fixed order, so this keeps
-// truncated results stable across calls.
+// compareLabelSets orders labelsets the way labels.Compare does: label by
+// label in name order, comparing names then values, with a shorter labelset
+// first when it is a prefix of the other.
+func compareLabelSets(a, b model.LabelSet) int {
+	aNames := slices.Sorted(maps.Keys(a))
+	bNames := slices.Sorted(maps.Keys(b))
+	for i := range min(len(aNames), len(bNames)) {
+		if c := cmp.Compare(aNames[i], bNames[i]); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a[aNames[i]], b[bNames[i]]); c != 0 {
+			return c
+		}
+	}
+	return cmp.Compare(len(aNames), len(bNames))
+}
+
+// sortAlerts sorts alerts in place, firing, then pending, then other states by
+// name, each group ordered by labelset. Prometheus returns alerts in no fixed
+// order, so this keeps truncated results stable across calls.
 func sortAlerts(alerts []promv1.Alert) {
 	slices.SortFunc(alerts, func(a, b promv1.Alert) int {
 		if c := cmp.Compare(alertStateRank(a.State), alertStateRank(b.State)); c != 0 {
 			return c
 		}
-		if a.Labels.Before(b.Labels) {
-			return -1
+		if c := cmp.Compare(a.State, b.State); c != 0 {
+			return c
 		}
-		if b.Labels.Before(a.Labels) {
-			return 1
+		if c := compareLabelSets(a.Labels, b.Labels); c != 0 {
+			return c
 		}
 		// Equal labelsets can come from different rules, so break ties
 		// on the remaining fields.
 		if c := a.ActiveAt.Compare(b.ActiveAt); c != 0 {
 			return c
 		}
-		return cmp.Compare(a.Value, b.Value)
+		if c := cmp.Compare(a.Value, b.Value); c != 0 {
+			return c
+		}
+		return compareLabelSets(a.Annotations, b.Annotations)
 	})
 }
 
