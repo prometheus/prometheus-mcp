@@ -255,7 +255,6 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "No calls",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -298,7 +297,7 @@
             "type": "prometheus",
             "uid": "$datasource"
           },
-          "expr": "sum(histogram_count(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])) or rate(prom_mcp_tool_call_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum(histogram_count(rate(prom_mcp_tool_call_duration_seconds{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])) or rate(prom_mcp_tool_call_duration_seconds_count{job=~\"$job\", instance=~\"$instance\"}[$__rate_interval])) or vector(0)",
           "legendFormat": "calls/sec",
           "refId": "A"
         }
