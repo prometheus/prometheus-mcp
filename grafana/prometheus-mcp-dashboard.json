@@ -1872,7 +1872,7 @@
             "showThresholdLabels": false,
             "showThresholdMarkers": true,
             "sizing": "auto",
-            "sparkline": true,
+            "sparkline": false,
             "textMode": "auto"
           },
           "targets": [
@@ -1882,7 +1882,9 @@
                 "uid": "$datasource"
               },
               "expr": "process_open_fds{job=~\"$job\", instance=~\"$instance\"} / process_max_fds{job=~\"$job\", instance=~\"$instance\"}",
+              "instant": true,
               "legendFormat": "{{ instance }}",
+              "range": false,
               "refId": "A"
             }
           ],
