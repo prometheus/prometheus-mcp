@@ -992,7 +992,7 @@
       ],
       "title": "Tool vs Backend Latency (p50 / p99)",
       "type": "timeseries",
-      "description": "Tool-call latency against the Prometheus API calls made on its behalf. The gap approximates the server's own cost (decode, truncation, serialisation); a tool call may issue more than one API call."
+      "description": "Tool-call latency against the Prometheus API calls made on its behalf. The gap is a rough guide to the server's own cost (decode, truncation, serialisation), not a measurement. A tool call may issue several API calls, and the docs and runbook tools issue none."
     },
     {
       "datasource": {
