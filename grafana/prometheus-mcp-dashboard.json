@@ -563,6 +563,7 @@
       },
       "fieldConfig": {
         "defaults": {
+          "decimals": 0,
           "noValue": "No tool calls",
           "thresholds": {
             "mode": "absolute",
