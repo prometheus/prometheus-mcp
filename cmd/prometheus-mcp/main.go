@@ -51,7 +51,9 @@ const (
 )
 
 var (
-	//go:embed all:external/docs
+	// external/README.md keeps this pattern matching when the gitignored docs
+	// snapshot is absent.
+	//go:embed all:external
 	assetsDocs embed.FS
 	docsFs     fs.FS
 
