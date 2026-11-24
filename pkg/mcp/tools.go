@@ -154,7 +154,6 @@ var (
 	listAlertsToolDef = &mcp.Tool{
 		Name:        "list_alerts",
 		Description: "List all active alerts",
-		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "List Alerts",
 			ReadOnlyHint: true,

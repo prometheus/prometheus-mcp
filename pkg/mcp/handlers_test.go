@@ -188,7 +188,7 @@ func TestQueryHandler(t *testing.T) {
 				require.False(t, isError)
 				// truncateStringByLines includes the trailing newline of the last line,
 				// so the truncated line ends with \n before the warning separator.
-				expectedWarning := strings.ReplaceAll(displayTruncationWarning(1), "\n", "\\n")
+				expectedWarning := strings.ReplaceAll(displayTruncationWarning(1, queryTruncationHint), "\n", "\\n")
 				expectedResult := fmt.Sprintf(`{"result":"{} => 1 @[1756143048]\n%s","warnings":null}`, expectedWarning)
 				require.JSONEq(t, expectedResult, result)
 			},
@@ -269,7 +269,7 @@ func TestQueryHandler(t *testing.T) {
 				require.False(t, isError)
 				// truncateStringByLines includes the trailing newline of the last line,
 				// so the truncated line ends with \n before the warning separator.
-				expectedWarning := strings.ReplaceAll(displayTruncationWarning(1), "\n", "\\n")
+				expectedWarning := strings.ReplaceAll(displayTruncationWarning(1, queryTruncationHint), "\n", "\\n")
 				expectedResult := fmt.Sprintf(`{"result":"{} => 1 @[1756143048]\n%s","warnings":null}`, expectedWarning)
 				require.JSONEq(t, expectedResult, result)
 			},
@@ -1500,9 +1500,21 @@ func TestFlagsHandler(t *testing.T) {
 
 func TestListAlertsHandler(t *testing.T) {
 	t.Parallel()
+	// Returned out of order, the way Prometheus can return them.
+	unsortedAlerts := func(ctx context.Context) (promv1.AlertsResult, error) {
+		return promv1.AlertsResult{
+			Alerts: []promv1.Alert{
+				{Labels: model.LabelSet{"alertname": "HighCPUUsage"}, State: promv1.AlertStatePending},
+				{Labels: model.LabelSet{"alertname": "InstanceDown"}, State: promv1.AlertStateFiring},
+				{Labels: model.LabelSet{"alertname": "DiskFull"}, State: promv1.AlertStateFiring},
+			},
+		}, nil
+	}
+
 	testCases := []struct {
 		name           string
 		args           map[string]any
+		globalLimit    int
 		mockAlertsFunc func(ctx context.Context) (promv1.AlertsResult, error)
 		validateResult func(t *testing.T, result string, isError bool, err error)
 	}{
@@ -1539,12 +1551,133 @@ func TestListAlertsHandler(t *testing.T) {
 				require.Contains(t, result, "prometheus exploded")
 			},
 		},
+		{
+			name: "sorts firing before pending, each by labels",
+			args: map[string]any{},
+			mockAlertsFunc: func(ctx context.Context) (promv1.AlertsResult, error) {
+				early := time.Date(2026, 11, 19, 10, 0, 0, 0, time.UTC)
+				late := early.Add(time.Minute)
+				// Each alert's summary marks it in the output. Alerts that only
+				// differ in a later field share labels.
+				alert := func(state promv1.AlertState, labels model.LabelSet, activeAt time.Time, value, summary string) promv1.Alert {
+					return promv1.Alert{
+						Labels:      labels,
+						Annotations: model.LabelSet{"summary": model.LabelValue(summary)},
+						State:       state,
+						ActiveAt:    activeAt,
+						Value:       value,
+					}
+				}
+				down := model.LabelSet{"alertname": "InstanceDown", "instance": "b"}
+				return promv1.AlertsResult{
+					Alerts: []promv1.Alert{
+						alert("unknown", model.LabelSet{"alertname": "Stale"}, early, "1", "m-unknown-state"),
+						alert(promv1.AlertStatePending, model.LabelSet{"alertname": "HighCPUUsage"}, early, "1", "m-pending-cpu"),
+						alert(promv1.AlertStateFiring, down, early, "2", "m-down-value-2"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "Watchdog"}, early, "1", "m-watchdog"),
+						alert(promv1.AlertStateFiring, down, late, "1", "m-down-late"),
+						alert(promv1.AlertStateInactive, model.LabelSet{"alertname": "Stale"}, early, "1", "m-inactive-state"),
+						alert(promv1.AlertStateFiring, down, early, "1", "m-down-value-1-z"),
+						alert(promv1.AlertStateFiring, down, early, "1", "m-down-value-1-a"),
+						alert(promv1.AlertStatePending, model.LabelSet{"alertname": "CacheMiss"}, early, "1", "m-pending-cache"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "DiskFull", "instance": "a"}, early, "1", "m-disk-instance"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "DiskFull", "job": "node"}, early, "1", "m-disk-job"),
+						alert(promv1.AlertStateFiring, model.LabelSet{"alertname": "DiskFull"}, early, "1", "m-disk"),
+					},
+				}, nil
+			},
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				want := []string{
+					// Firing, by labels in name order, comparing names then
+					// values. A labelset that is a prefix of another comes
+					// first, and a single-label Watchdog sorts by its value,
+					// not its label count.
+					"m-disk",
+					"m-disk-instance",
+					"m-disk-job",
+					// Same labels: earlier ActiveAt, then lower value, then annotations.
+					"m-down-value-1-a",
+					"m-down-value-1-z",
+					"m-down-value-2",
+					"m-down-late",
+					"m-watchdog",
+					// Pending, by labels.
+					"m-pending-cache",
+					"m-pending-cpu",
+					// Other states, by state when the labels match.
+					"m-inactive-state",
+					"m-unknown-state",
+				}
+				last := -1
+				for _, marker := range want {
+					i := strings.Index(result, `"`+marker+`"`)
+					require.Greater(t, i, last, "%s is out of order: %s", marker, result)
+					last = i
+				}
+				require.NotContains(t, result, "truncated")
+			},
+		},
+		{
+			name:           "global limit keeps the first sorted alerts",
+			args:           map[string]any{},
+			globalLimit:    2,
+			mockAlertsFunc: unsortedAlerts,
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "DiskFull")
+				require.Contains(t, result, "InstanceDown")
+				require.NotContains(t, result, "HighCPUUsage")
+				require.True(t, strings.HasSuffix(result, displayTruncationWarning(2, alertsTruncationHint)))
+				require.NotContains(t, result, "aggregation")
+			},
+		},
+		{
+			name:           "per-call limit overrides global limit",
+			args:           map[string]any{"truncation_limit": 1},
+			globalLimit:    2,
+			mockAlertsFunc: unsortedAlerts,
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "DiskFull")
+				require.NotContains(t, result, "InstanceDown")
+				require.True(t, strings.HasSuffix(result, displayTruncationWarning(1, alertsTruncationHint)))
+			},
+		},
+		{
+			name:           "per-call -1 disables truncation",
+			args:           map[string]any{"truncation_limit": -1},
+			globalLimit:    1,
+			mockAlertsFunc: unsortedAlerts,
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "HighCPUUsage")
+				require.NotContains(t, result, "truncated")
+			},
+		},
+		{
+			name:           "result at the limit does not warn",
+			args:           map[string]any{},
+			globalLimit:    3,
+			mockAlertsFunc: unsortedAlerts,
+			validateResult: func(t *testing.T, result string, isError bool, err error) {
+				require.NoError(t, err)
+				require.False(t, isError)
+				require.Contains(t, result, "HighCPUUsage")
+				require.NotContains(t, result, "truncated")
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockAPI := &MockPrometheusAPI{AlertsFunc: tc.mockAlertsFunc}
 			container := newTestContainer(mockAPI)
+			container.truncationLimit = tc.globalLimit
 
 			ts := mcptest.NewTestServer(t)
 			mcptest.AddTool(ts, listAlertsToolDef, container.ListAlertsHandler)

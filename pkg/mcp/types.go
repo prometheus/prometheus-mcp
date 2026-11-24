@@ -136,6 +136,18 @@ func (lvi LabelValuesInput) LogValue() slog.Value {
 	)
 }
 
+// ListAlertsInput is the input for the list alerts tool.
+type ListAlertsInput struct {
+	TruncatableInput
+}
+
+// LogValue implements slog.LogValuer.
+func (lai ListAlertsInput) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Int("truncation_limit", lai.TruncationLimit),
+	)
+}
+
 // MetricMetadataInput is the input for the metric metadata tool.
 type MetricMetadataInput struct {
 	Metric string `json:"metric,omitempty" jsonschema:"metric name to retrieve metadata for, all metrics if empty"`

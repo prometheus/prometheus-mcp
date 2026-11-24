@@ -1,5 +1,10 @@
 {
   "additionalProperties": false,
-  "properties": {},
+  "properties": {
+    "truncation_limit": {
+      "description": "truncation limit for query response in number of lines/entries; use lower limits (e.g. 50-100) for initial exploration, set to -1 to disable truncation",
+      "type": "integer"
+    }
+  },
   "type": "object"
 }
