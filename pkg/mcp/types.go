@@ -170,11 +170,11 @@ func (tmi TargetsMetadataInput) LogValue() slog.Value {
 // optional filters; a rule must satisfy every filter that is set.
 type ListRulesInput struct {
 	Type      string   `json:"type,omitempty" jsonschema:"only return rules of this type: alerting or recording"`
-	State     string   `json:"state,omitempty" jsonschema:"only return alerting rules in this state: firing, pending or inactive (recording rules are omitted)"`
+	State     string   `json:"state,omitempty" jsonschema:"only return alerting rules in this state: firing, pending, inactive or unknown (recording rules are omitted)"`
 	Health    string   `json:"health,omitempty" jsonschema:"only return rules with this evaluation health: ok, err or unknown"`
 	RuleName  string   `json:"rule_name,omitempty" jsonschema:"only return rules with exactly this name"`
 	RuleGroup string   `json:"rule_group,omitempty" jsonschema:"only return rules from the rule group with exactly this name"`
-	Matches   []string `json:"matches,omitempty" jsonschema:"label selectors; only return rules whose labels match at least one of them"`
+	Matches   []string `json:"matches,omitempty" jsonschema:"label selectors; only return rules whose labels match"`
 }
 
 // LogValue implements slog.LogValuer.

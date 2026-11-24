@@ -22,7 +22,7 @@ import (
 
 var (
 	ruleTypes     = []string{"alerting", "recording"}
-	ruleStates    = []string{"firing", "pending", "inactive"}
+	ruleStates    = []string{"firing", "pending", "inactive", "unknown"}
 	ruleHealths   = []string{"ok", "err", "unknown"}
 	targetStates  = []string{"active", "dropped", "any"}
 	targetHealths = []string{"up", "down", "unknown"}

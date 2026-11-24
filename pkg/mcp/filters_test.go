@@ -94,6 +94,7 @@ func TestListRulesInputFilter(t *testing.T) {
 func TestListRulesInputValidate(t *testing.T) {
 	t.Parallel()
 	require.ErrorContains(t, ListRulesInput{Type: "alert"}.validate(), `invalid type "alert"`)
+	require.NoError(t, ListRulesInput{State: "unknown"}.validate())
 	require.ErrorContains(t, ListRulesInput{State: "FIRING"}.validate(), `invalid state "FIRING"`)
 	require.ErrorContains(t, ListRulesInput{Health: "bad"}.validate(), `invalid health "bad"`)
 }

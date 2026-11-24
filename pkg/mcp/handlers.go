@@ -986,25 +986,45 @@ func (s *ServerContainer) runtimeinfoAPICall(ctx context.Context) (string, error
 }
 
 func (s *ServerContainer) rulesAPICall(ctx context.Context, input ListRulesInput) (string, error) {
-	return s.doSimpleAPICall(ctx, "/api/v1/rules", "failed to get rules from Prometheus",
-		func(ctx context.Context, client promv1.API) (any, error) {
-			res, err := client.Rules(ctx, input.Matches)
-			if err != nil {
-				return nil, err
-			}
-			return input.filter(res), nil
-		})
+	client, _ := s.GetAPIClient(ctx)
+	ctx, cancel := context.WithTimeout(ctx, s.apiTimeout)
+	defer cancel()
+
+	path := "/api/v1/rules"
+	startTs := time.Now()
+	res, err := client.Rules(ctx, input.Matches)
+	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
+	if err != nil {
+		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
+		return "", fmt.Errorf("failed to get rules from Prometheus: %w", wrapErrorIfNotFound(err, path))
+	}
+
+	encodedData, err := s.FormatOutput(input.filter(res))
+	if err != nil {
+		return "", fmt.Errorf("failed to encode rules: %w", err)
+	}
+	return encodedData, nil
 }
 
 func (s *ServerContainer) targetsAPICall(ctx context.Context, input ListTargetsInput) (string, error) {
-	return s.doSimpleAPICall(ctx, "/api/v1/targets", "failed to get targets from Prometheus",
-		func(ctx context.Context, client promv1.API) (any, error) {
-			res, err := client.Targets(ctx)
-			if err != nil {
-				return nil, err
-			}
-			return input.filter(res), nil
-		})
+	client, _ := s.GetAPIClient(ctx)
+	ctx, cancel := context.WithTimeout(ctx, s.apiTimeout)
+	defer cancel()
+
+	path := "/api/v1/targets"
+	startTs := time.Now()
+	res, err := client.Targets(ctx)
+	metricAPICallDuration.With(prometheus.Labels{"target_path": path}).Observe(time.Since(startTs).Seconds())
+	if err != nil {
+		metricAPICallsFailed.With(prometheus.Labels{"target_path": path}).Inc()
+		return "", fmt.Errorf("failed to get targets from Prometheus: %w", wrapErrorIfNotFound(err, path))
+	}
+
+	encodedData, err := s.FormatOutput(input.filter(res))
+	if err != nil {
+		return "", fmt.Errorf("failed to encode targets: %w", err)
+	}
+	return encodedData, nil
 }
 
 func (s *ServerContainer) walReplayAPICall(ctx context.Context) (string, error) {

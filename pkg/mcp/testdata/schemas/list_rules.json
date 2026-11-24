@@ -6,7 +6,7 @@
       "type": "string"
     },
     "matches": {
-      "description": "label selectors; only return rules whose labels match at least one of them",
+      "description": "label selectors; only return rules whose labels match",
       "items": {
         "type": "string"
       },
@@ -21,7 +21,7 @@
       "type": "string"
     },
     "state": {
-      "description": "only return alerting rules in this state: firing, pending or inactive (recording rules are omitted)",
+      "description": "only return alerting rules in this state: firing, pending, inactive or unknown (recording rules are omitted)",
       "type": "string"
     },
     "type": {
