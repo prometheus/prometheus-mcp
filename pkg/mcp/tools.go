@@ -60,10 +60,9 @@ var (
 		Name:        "query",
 		Description: "Execute an instant query against the Prometheus datasource, returning one value per series at a single point in time",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Instant Query",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Instant Query",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -71,10 +70,9 @@ var (
 		Name:        "range_query",
 		Description: "Execute a range query against the Prometheus datasource, returning values over a time window; use for graphing and trend analysis",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Range Query",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Range Query",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -82,10 +80,9 @@ var (
 		Name:        "exemplar_query",
 		Description: "Execute an exemplar query against the Prometheus datasource to find trace exemplars associated with metric samples",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Exemplar Query",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Exemplar Query",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -94,10 +91,9 @@ var (
 		Description: "Finds series by label matches",
 		InputSchema: inputSchemaFor[SeriesInput](),
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Find Series",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Find Series",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -106,10 +102,9 @@ var (
 		Description: "Returns the unique label names present in the block in sorted order by given time range and matches",
 		InputSchema: inputSchemaFor[LabelNamesInput](),
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Label Names",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Label Names",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -118,10 +113,9 @@ var (
 		Description: "Performs a query for the values of the given label, time range and matches",
 		InputSchema: inputSchemaFor[LabelValuesInput](),
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Label Values",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Label Values",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -129,10 +123,9 @@ var (
 		Name:        "metric_metadata",
 		Description: "Returns metadata about metrics currently scraped by the metric name.",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Metric Metadata",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Metric Metadata",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -140,10 +133,9 @@ var (
 		Name:        "targets_metadata",
 		Description: "Returns metadata about metrics currently scraped by the target ",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Targets Metadata",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Targets Metadata",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -152,10 +144,9 @@ var (
 		Description: "Get overview of Prometheus Alertmanager discovery",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Alertmanagers",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Alertmanagers",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -164,10 +155,9 @@ var (
 		Description: "Get runtime flags",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Runtime Flags",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Runtime Flags",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -176,10 +166,9 @@ var (
 		Description: "List all active alerts",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "List Alerts",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "List Alerts",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -188,10 +177,9 @@ var (
 		Description: "Get usage and cardinality statistics from the TSDB",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "TSDB Stats",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "TSDB Stats",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -200,10 +188,9 @@ var (
 		Description: "Get Prometheus build information",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Build Info",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Build Info",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -212,10 +199,9 @@ var (
 		Description: "Get Prometheus configuration",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Configuration",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Configuration",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -224,10 +210,9 @@ var (
 		Description: "Get Prometheus runtime information",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Runtime Info",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Runtime Info",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -236,10 +221,9 @@ var (
 		Description: "List all alerting and recording rules that are loaded",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "List Rules",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "List Rules",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -248,10 +232,9 @@ var (
 		Description: "Get overview of Prometheus target discovery",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "List Targets",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "List Targets",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -260,10 +243,9 @@ var (
 		Description: "Get current WAL replay status",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "WAL Replay Status",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "WAL Replay Status",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -308,10 +290,9 @@ var (
 		Description: "Management API endpoint that can be used to check Prometheus health.",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Health Check",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Health Check",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -320,10 +301,9 @@ var (
 		Description: "Management API endpoint that can be used to check Prometheus is ready to serve traffic (i.e. respond to queries.)",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Readiness Check",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "Readiness Check",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 
@@ -356,10 +336,9 @@ var (
 		Description: "List of Official Prometheus Documentation Files.",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "List Documentation",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(false),
+			Title:         "List Documentation",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
 		},
 	}
 
@@ -367,10 +346,9 @@ var (
 		Name:        "docs_read",
 		Description: "Read the named markdown file containing official Prometheus documentation from the prometheus/docs repo",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Read Documentation",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(false),
+			Title:         "Read Documentation",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
 		},
 	}
 
@@ -378,10 +356,9 @@ var (
 		Name:        "docs_search",
 		Description: "Search the markdown files containing official Prometheus documentation from the prometheus/docs repo",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Search Documentation",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(false),
+			Title:         "Search Documentation",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
 		},
 	}
 
@@ -391,10 +368,9 @@ var (
 		Description: "List the runbooks embedded in this server: guided workflows (Agent Skills) for common Prometheus tasks - investigating error rates and alert spikes, finding top CPU/memory/disk consumers, troubleshooting missing metrics or empty query results, health-checking Prometheus, reducing high-cardinality metrics, reviewing and drafting recording and alerting rules, and tuning Prometheus configuration. Call this and read the matching runbook with runbooks_read before starting any of these tasks.",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "List Runbooks",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(false),
+			Title:         "List Runbooks",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
 		},
 	}
 
@@ -402,10 +378,9 @@ var (
 		Name:        "runbooks_read",
 		Description: "Read the named runbook: a guided workflow (Agent Skill) for a common Prometheus task, expressed in terms of this server's tools. Follow its guidance when a user request matches a runbook's purpose; runbooks_list shows what is available.",
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "Read Runbook",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(false),
+			Title:         "Read Runbook",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(false),
 		},
 	}
 
@@ -415,10 +390,9 @@ var (
 		Description: "List all store API servers",
 		InputSchema: emptyInputSchema,
 		Annotations: &mcp.ToolAnnotations{
-			Title:          "List Stores",
-			ReadOnlyHint:   true,
-			IdempotentHint: true,
-			OpenWorldHint:  ptr(true),
+			Title:         "List Stores",
+			ReadOnlyHint:  true,
+			OpenWorldHint: ptr(true),
 		},
 	}
 )
