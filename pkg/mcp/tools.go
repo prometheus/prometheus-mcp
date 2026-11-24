@@ -257,7 +257,6 @@ var (
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Clean Tombstones",
 			DestructiveHint: ptr(true),
-			IdempotentHint:  true,
 			OpenWorldHint:   ptr(true),
 		},
 	}
@@ -269,7 +268,6 @@ var (
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Delete Series",
 			DestructiveHint: ptr(true),
-			IdempotentHint:  true,
 			OpenWorldHint:   ptr(true),
 		},
 	}
@@ -314,7 +312,6 @@ var (
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Reload Config",
 			DestructiveHint: ptr(true),
-			IdempotentHint:  true,
 			OpenWorldHint:   ptr(true),
 		},
 	}
