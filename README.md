@@ -84,8 +84,8 @@ Please see [Flags](#command-line-flags) for more information on the available fl
 | `label_names` | Returns the unique label names present in the block in sorted order by given time range and matchers |
 | `label_values` | Performs a query for the values of the given label, time range and matchers |
 | `list_alerts` | List all active alerts |
-| `list_rules` | List all alerting and recording rules that are loaded |
-| `list_targets` | Get overview of Prometheus target discovery |
+| `list_rules` | List alerting and recording rules that are loaded, optionally filtered by type, state, health, name, group or labels |
+| `list_targets` | Get overview of Prometheus target discovery, optionally filtered by state, health or scrape pool |
 | `metric_metadata` | Returns metadata about metrics currently scraped by the metric name | 
 | `query` | Execute an instant query against the Prometheus datasource, returning one value per series at a single point in time |
 | `quit` | Management API endpoint that can be used to trigger a graceful shutdown of Prometheus |

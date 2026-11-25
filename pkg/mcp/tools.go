@@ -203,8 +203,8 @@ var (
 
 	listRulesToolDef = &mcp.Tool{
 		Name:        "list_rules",
-		Description: "List all alerting and recording rules that are loaded",
-		InputSchema: emptyInputSchema,
+		Description: "List alerting and recording rules that are loaded, optionally filtered by type, state, health, name, group or labels",
+		InputSchema: inputSchemaFor[ListRulesInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "List Rules",
 			ReadOnlyHint: true,
@@ -213,8 +213,8 @@ var (
 
 	listTargetsToolDef = &mcp.Tool{
 		Name:        "list_targets",
-		Description: "Get overview of Prometheus target discovery",
-		InputSchema: emptyInputSchema,
+		Description: "Get overview of Prometheus target discovery, optionally filtered by state, health or scrape pool",
+		InputSchema: inputSchemaFor[ListTargetsInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:        "List Targets",
 			ReadOnlyHint: true,
