@@ -161,6 +161,7 @@ type ServerConfig struct {
 	PrometheusBackend     string
 	PrometheusTimeout     time.Duration
 	TruncationLimit       int
+	MaxResponseSize       int64
 	RoundTripper          http.RoundTripper
 	TSDBAdminToolsEnabled bool
 	EnabledTools          []string
@@ -317,6 +318,7 @@ func newServerContainer(cfg ServerConfig) (*ServerContainer, error) {
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
+	rt = mcpProm.NewResponseSizeLimitRoundTripper(cfg.MaxResponseSize, rt)
 
 	client, err := mcpProm.NewAPIClient(cfg.PrometheusURL, rt)
 	if err != nil {
