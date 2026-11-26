@@ -66,6 +66,9 @@ This feature allows you to set a maximum limit on the number of lines or entries
 Setting the limit to `0` disables truncation.
 Truncation is disabled by default.
 Note that LLMs capable of handling tool request arguments can override this global truncation limit on a per-tool-call basis for supported tools.
+The limit in effect is also sent to the backend as the API `limit` parameter for the `query`, `range_query`, `series`, `label_names`, and `label_values` tools, so the backend can drop the surplus before the server reads it.
+For queries the backend counts series while truncation counts lines, so a range query still returns every sample of the series it keeps.
+Backends that ignore `limit`, such as Thanos on `query` and `range_query`, return the full response and it is truncated after being read.
 Please see [Flags](#command-line-flags) for more information on the available flags and their corresponding environment variables.
 
 #### Full Tool List
@@ -519,6 +522,9 @@ Flags:
                                  If enabled, this controls the maximum query
                                  response size in number of lines/entries
                                  provided to the LLM from the API response.
+                                 The limit is also sent to the backend as the
+                                 API 'limit' parameter; backends that ignore
+                                 it are truncated after the response is read.
                                  LLMs can override truncation limits if
                                  needed on a per-tool-call basis via tool
                                  request arguments on supported tools.
