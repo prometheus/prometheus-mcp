@@ -1,0 +1,14 @@
+headStats:
+  chunkCount: 0
+  maxTime: -9223372036854776000
+  minTime: 9223372036854776000
+  numLabelPairs: 0
+  numSeries: 0
+labelValueCountByLabelName[1]{name,value}:
+  __name__,2
+memoryInBytesByLabelName: []
+seriesCountByLabelValuePair[1]{name,value}:
+  job=prometheus,2
+seriesCountByMetricName[2]{name,value}:
+  up,2
+  http_requests_total,1
