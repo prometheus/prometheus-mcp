@@ -36,6 +36,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/prometheus-mcp/pkg/mcp/mcptest"
+	mcpProm "github.com/prometheus/prometheus-mcp/pkg/prometheus"
 )
 
 // newTestContainer creates a ServerContainer with sensible defaults for testing.
@@ -1819,6 +1820,76 @@ func TestTsdbStatsHandler(t *testing.T) {
 			resultText := mcptest.GetResultText(result)
 			isError := result != nil && result.IsError
 			tc.validateResult(t, resultText, isError, err)
+		})
+	}
+}
+
+// TestTsdbStatsHandlerLimit runs a real client over a mock RoundTripper
+// because the mock API cannot see promv1 options.
+func TestTsdbStatsHandlerLimit(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name          string
+		args          map[string]any
+		expectedPath  string
+		expectedLimit string
+		expectedError string
+	}{
+		{
+			name:         "no limit leaves the backend default",
+			args:         map[string]any{},
+			expectedPath: "/api/v1/status/tsdb",
+		},
+		{
+			name:          "limit is sent to the backend",
+			args:          map[string]any{"limit": 50},
+			expectedPath:  "/api/v1/status/tsdb",
+			expectedLimit: "50",
+		},
+		{
+			name:          "negative limit is rejected",
+			args:          map[string]any{"limit": -1},
+			expectedError: "invalid limit -1: must be a positive number",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotPath, gotLimit string
+			client, err := mcpProm.NewAPIClient("http://localhost:9090", &mockRoundTripper{
+				RoundTripFunc: func(req *http.Request) (*http.Response, error) {
+					gotPath = req.URL.Path
+					gotLimit = req.URL.Query().Get("limit")
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     http.Header{"Content-Type": []string{"application/json"}},
+						Body:       io.NopCloser(strings.NewReader(`{"status":"success","data":{"headStats":{"numSeries":1000},"seriesCountByMetricName":[{"name":"http_requests_total","value":100}]}}`)),
+						Request:    req,
+					}, nil
+				},
+			})
+			require.NoError(t, err)
+			container := newTestContainer(nil)
+			container.defaultAPIClient = client
+
+			ts := mcptest.NewTestServer(t)
+			mcptest.AddTool(ts, tsdbStatsToolDef, container.TsdbStatsHandler)
+
+			result, err := ts.CallTool(ts.Context(), "tsdb_stats", tc.args)
+			require.NoError(t, err)
+
+			resultText := mcptest.GetResultText(result)
+			if tc.expectedError != "" {
+				require.True(t, result.IsError)
+				require.Contains(t, resultText, tc.expectedError)
+			} else {
+				require.False(t, result.IsError, resultText)
+				require.Contains(t, resultText, "http_requests_total")
+			}
+			require.Equal(t, tc.expectedPath, gotPath)
+			require.Equal(t, tc.expectedLimit, gotLimit)
 		})
 	}
 }

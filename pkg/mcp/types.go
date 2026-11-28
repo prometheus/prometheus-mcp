@@ -166,6 +166,18 @@ func (tmi TargetsMetadataInput) LogValue() slog.Value {
 	)
 }
 
+// TsdbStatsInput is the input for the TSDB stats tool.
+type TsdbStatsInput struct {
+	Limit int `json:"limit,omitempty" jsonschema:"maximum number of entries to return in each statistics list (e.g. seriesCountByMetricName); the backend default of 10 is used if unset, and Prometheus allows at most 10000"`
+}
+
+// LogValue implements slog.LogValuer.
+func (tsi TsdbStatsInput) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.Int("limit", tsi.Limit),
+	)
+}
+
 // ListRulesInput is the input for the list rules tool. All fields are
 // optional filters; a rule must satisfy every filter that is set.
 type ListRulesInput struct {

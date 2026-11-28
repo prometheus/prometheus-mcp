@@ -3,6 +3,7 @@
 ## Unreleased
 
 * [FEATURE] mcp: `list_rules` accepts optional `type`, `state`, `health`, `rule_name`, `rule_group` and `matches` filters, and `list_targets` accepts optional `state`, `health` and `scrape_pool` filters, so clients can fetch just the rules or targets they care about instead of the full listing. #219
+* [FEATURE] mcp: `tsdb_stats` accepts an optional `limit` that is passed to the backend as the API `limit` parameter, so clients can fetch more (or fewer) than the default 10 entries per statistics list, e.g. to rank the top 50 metrics by series count.
 
 ## 0.19.0-rc.0 / 2026-11-01
 

@@ -1,5 +1,10 @@
 {
   "additionalProperties": false,
-  "properties": {},
+  "properties": {
+    "limit": {
+      "description": "maximum number of entries to return in each statistics list (e.g. seriesCountByMetricName); the backend default of 10 is used if unset, and Prometheus allows at most 10000",
+      "type": "integer"
+    }
+  },
   "type": "object"
 }
