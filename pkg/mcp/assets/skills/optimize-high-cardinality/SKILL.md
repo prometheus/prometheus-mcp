@@ -11,7 +11,7 @@ Cardinality (the number of unique label combinations) drives Prometheus memory, 
 
 ## Getting oriented
 
-- tsdb_stats is the primary instrument: seriesCountByMetricName ranks the biggest metrics, labelValueCountByLabelName exposes labels with huge value sets, and memoryInBytesByLabelName shows what they cost.
+- tsdb_stats is the primary instrument: seriesCountByMetricName ranks the biggest metrics, labelValueCountByLabelName exposes labels with huge value sets, and memoryInBytesByLabelName shows what they cost. Each list holds the top 10 entries by default; raise its limit argument to see further down the rankings.
 - series and label_values let you inspect a suspect metric's actual label combinations and values.
 - targets_metadata shows which targets expose a metric, i.e. where a fix would need to be applied.
 - Prometheus's own TSDB metrics track cardinality live: range_query prometheus_tsdb_head_series for overall growth, rate(prometheus_tsdb_head_series_created_total[5m]) for churn, and topk(10, scrape_series_added) to attribute new series to the targets creating them.

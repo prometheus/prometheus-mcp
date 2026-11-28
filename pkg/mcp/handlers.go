@@ -342,8 +342,15 @@ func (s *ServerContainer) ListAlertsHandler(ctx context.Context, req *mcp.CallTo
 }
 
 // TsdbStatsHandler handles the TSDB stats tool.
-func (s *ServerContainer) TsdbStatsHandler(ctx context.Context, req *mcp.CallToolRequest, input EmptyInput) (*mcp.CallToolResult, any, error) {
-	return callAPIAndReturnToolResult(ctx, s.tsdbStatsAPICall, "failed making TSDB stats api call: ")
+func (s *ServerContainer) TsdbStatsHandler(ctx context.Context, req *mcp.CallToolRequest, input TsdbStatsInput) (*mcp.CallToolResult, any, error) {
+	if input.Limit < 0 {
+		return newToolErrorResult(fmt.Sprintf("invalid limit %d: must be a positive number", input.Limit)), nil, nil
+	}
+	result, err := s.tsdbStatsAPICall(ctx, input.Limit)
+	if err != nil {
+		return newToolErrorResult("failed making TSDB stats api call: " + err.Error()), nil, nil
+	}
+	return newToolTextResult(result), nil, nil
 }
 
 // BuildInfoHandler handles the build info tool.
@@ -957,10 +964,12 @@ func (s *ServerContainer) listAlertsAPICall(ctx context.Context) (string, error)
 		})
 }
 
-func (s *ServerContainer) tsdbStatsAPICall(ctx context.Context) (string, error) {
+// tsdbStatsAPICall fetches TSDB stats. A limit of 0 sends no limit parameter,
+// leaving the backend's default in place.
+func (s *ServerContainer) tsdbStatsAPICall(ctx context.Context, limit int) (string, error) {
 	return s.doSimpleAPICall(ctx, "/api/v1/status/tsdb", "failed to get tsdb stats from Prometheus",
 		func(ctx context.Context, client promv1.API) (any, error) {
-			return client.TSDB(ctx)
+			return client.TSDB(ctx, promv1.WithLimit(uint64(limit)))
 		})
 }
 

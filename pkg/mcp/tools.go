@@ -174,8 +174,8 @@ var (
 
 	tsdbStatsToolDef = &mcp.Tool{
 		Name:        "tsdb_stats",
-		Description: "Get usage and cardinality statistics from the TSDB",
-		InputSchema: emptyInputSchema,
+		Description: "Get usage and cardinality statistics from the TSDB, optionally with a custom number of entries per statistics list",
+		InputSchema: inputSchemaFor[TsdbStatsInput](),
 		Annotations: &mcp.ToolAnnotations{
 			Title:         "TSDB Stats",
 			ReadOnlyHint:  true,

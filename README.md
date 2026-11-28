@@ -97,7 +97,7 @@ Please see [Flags](#command-line-flags) for more information on the available fl
 | `runtime_info` | Get Prometheus runtime information |
 | `series` | Finds series by label matchers |
 | `targets_metadata` | Returns metadata about metrics currently scraped by the target |
-| `tsdb_stats` | Get usage and cardinality statistics from the TSDB |
+| `tsdb_stats` | Get usage and cardinality statistics from the TSDB, optionally with a custom number of entries per statistics list |
 | `wal_replay_status` | Get current WAL replay status |
 
 __NOTE:__ 
